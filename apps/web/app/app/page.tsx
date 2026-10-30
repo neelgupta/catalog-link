@@ -1,4 +1,6 @@
+import { Check } from "lucide-react";
 import { VISIBLE_PRODUCT } from "@cataloglink/core/links";
+import { newOrderCount } from "@cataloglink/core/orders";
 import { prisma } from "@cataloglink/db";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -34,7 +36,7 @@ export default async function ClientHome() {
       },
     }),
     prisma.catalogLink.count({ where: { clientId, isDefault: false } }),
-    prisma.order.count({ where: { clientId, status: "PLACED" } }),
+    newOrderCount(clientId),
   ]);
   const profileDone =
     !!client.logoUrl &&
@@ -124,14 +126,19 @@ export default async function ClientHome() {
         subtitle="Here's how your catalog is doing."
       />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-4 xl:grid-cols-5">
-        <Link href="/app/orders" className={`block rounded-2xl transition hover:ring-2 hover:ring-brand-100 ${newOrders ? "ring-2 ring-brand-500" : ""}`}>
-          <Stat label="New orders" value={newOrders} hint={newOrders ? "Waiting for you to confirm" : "View all orders"} />
-        </Link>
-        <Stat label="Products on link" value={products} />
-        <Stat label="Out of stock" value={outOfStock} />
-        <Stat label="Custom links" value={customLinks} />
+        <Stat
+          label="New orders"
+          value={newOrders}
+          hint={newOrders ? "Waiting for you" : "View all orders"}
+          href={newOrders ? "/app/orders?status=new" : "/app/orders?status=all"}
+          highlight={newOrders > 0}
+        />
+        <Stat label="Products on link" value={products} href="/app/products?show=visible" />
+        <Stat label="Out of stock" value={outOfStock} href="/app/products?stock=out" />
+        <Stat label="Custom links" value={customLinks} href="/app/links" />
         <Stat
           label="Last sync"
+          href="/app/sheet"
           value={
             <span className="text-base">
               {conn?.lastSyncedAt ? formatDateTime(conn.lastSyncedAt) : "—"}
@@ -154,7 +161,7 @@ export default async function ClientHome() {
                   }`}
                   aria-label={s.done ? "Done" : `Step ${i + 1}`}
                 >
-                  {s.done ? "✓" : i + 1}
+                  {s.done ? <Check aria-hidden="true" className="size-4" /> : i + 1}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium">{s.title}</p>

@@ -57,7 +57,7 @@ export async function updateClientAction(clientId: string, _prev: ActionState, f
     return errorState(err, values);
   }
   revalidatePath("/admin", "layout");
-  redirect(`/admin/clients/${clientId}?notice=updated`);
+  return { ok: true, message: "Client details saved." };
 }
 
 export async function setClientStatusAction(clientId: string, formData: FormData) {

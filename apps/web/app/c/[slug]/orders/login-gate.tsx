@@ -7,7 +7,7 @@ import { CustomerLogin } from "../_components/customer-login";
 export function LoginGate({ slug, devHint }: { slug: string; devHint: boolean }) {
   const router = useRouter();
   return (
-    <div className="mx-auto max-w-sm rounded-2xl bg-white p-5 ring-1 ring-stone-200">
+    <div className="mx-auto max-w-sm rounded-2xl bg-white p-5 text-left ring-1 ring-stone-200">
       <CustomerLogin slug={slug} devHint={devHint} title="See your orders" onVerified={() => router.refresh()} />
     </div>
   );

@@ -23,7 +23,7 @@ function StepForm({ orderId, to, label, withNote }: { orderId: string; to: Order
       {withNote && (
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-stone-700">Transport / LR number (optional)</span>
-          <input name="note" maxLength={300} placeholder="e.g. VRL Logistics, LR 4471" className="h-10 w-full rounded-lg border border-stone-300 px-3 text-base outline-none focus:border-brand-500 sm:text-sm" />
+          <input name="note" maxLength={300} placeholder="e.g. VRL Logistics, LR 4471" className="h-10 w-full rounded-xl border border-stone-300 px-3 text-base outline-none focus:border-brand-500 sm:text-sm" />
         </label>
       )}
       <SubmitButton className="w-full" pendingText="Saving…">
@@ -48,7 +48,7 @@ function CloseForm({ orderId, to, onCancel }: { orderId: string; to: "REJECTED" 
           maxLength={300}
           autoFocus
           placeholder={to === "REJECTED" ? "e.g. This design is sold out" : "e.g. Customer asked to cancel"}
-          className="h-10 w-full rounded-lg border border-stone-300 bg-white px-3 text-base outline-none focus:border-brand-500 sm:text-sm"
+          className="h-10 w-full rounded-xl border border-stone-300 bg-white px-3 text-base outline-none focus:border-brand-500 sm:text-sm"
         />
       </label>
       <p className="text-xs text-stone-600">The held stock goes back to your catalog.</p>

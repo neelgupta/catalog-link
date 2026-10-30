@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 type Img = { thumbUrl: string; fullUrl: string; blurDataUrl: string | null };
@@ -169,17 +170,17 @@ function Viewer({
             type="button"
             onClick={() => step(-1)}
             disabled={i === 0}
-            className="rounded-full bg-white/15 px-5 py-2 text-sm text-white disabled:opacity-30"
+            className="inline-flex items-center gap-1 rounded-full bg-white/15 px-5 py-2 text-sm text-white disabled:opacity-30"
           >
-            ← Previous
+            <ChevronLeft aria-hidden="true" className="size-4" /> Previous
           </button>
           <button
             type="button"
             onClick={() => step(1)}
             disabled={i === images.length - 1}
-            className="rounded-full bg-white/15 px-5 py-2 text-sm text-white disabled:opacity-30"
+            className="inline-flex items-center gap-1 rounded-full bg-white/15 px-5 py-2 text-sm text-white disabled:opacity-30"
           >
-            Next →
+            Next <ChevronRight aria-hidden="true" className="size-4" />
           </button>
         </div>
       )}

@@ -1,8 +1,10 @@
+import { Check, Download, ListFilter, X } from "lucide-react";
 import { listOrders, OPEN_STATUSES, ORDER_TABS, type OrderTab } from "@cataloglink/core/orders";
 import { forClient } from "@cataloglink/db";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { buttonClass, EmptyState, PageHeader } from "@/components/ui";
+import { LiveForm } from "@/components/live-form";
+import { buttonClass, EmptyState, PageHeader, SearchField } from "@/components/ui";
 import { requireClient } from "@/lib/auth";
 import { formatDate, formatDateTime, formatRupees } from "@/lib/format";
 import { OrderStatusBadge, PAYMENT_LABEL } from "./status-badge";
@@ -10,7 +12,7 @@ import { OrderStatusBadge, PAYMENT_LABEL } from "./status-badge";
 export const metadata: Metadata = { title: "Orders" };
 
 const PAGE_SIZE = 25;
-const inputClass = "h-10 w-full min-w-0 rounded-lg border border-stone-300 bg-white px-3 text-base outline-none focus:border-brand-500 sm:text-sm";
+const inputClass = "h-10 w-full min-w-0 rounded-xl border border-stone-300 bg-white px-3 text-base outline-none focus:border-brand-500 sm:text-sm";
 
 export default async function OrdersPage({
   searchParams,
@@ -62,41 +64,27 @@ export default async function OrdersPage({
         subtitle={counts.new ? `${counts.new} new order${counts.new === 1 ? "" : "s"} waiting for you` : "Orders placed on your catalog links"}
         action={
           <a href={exportHref} className={buttonClass("secondary", "px-3 sm:px-4")} aria-label="Export to Excel" title="Export to Excel">
-            <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />
-            </svg>
+            <Download aria-hidden="true" className="size-4" />
             <span className="hidden sm:inline">Export Excel</span>
           </a>
         }
       />
 
-      <form action="/app/orders" className="mb-3 rounded-2xl border border-stone-200 bg-white p-3 sm:p-4">
+      <LiveForm action="/app/orders" className="mb-3 rounded-2xl border border-stone-200 bg-white p-3 sm:p-4">
         <input type="hidden" name="status" value={tab} />
         {/* One set of fields: the Filters button shows them on phones; always visible from md up. */}
         <input id="order-filters" type="checkbox" className="peer sr-only" />
         <div className="flex gap-2">
-          <div className="relative min-w-0 flex-1">
-            <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-stone-400" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
-              <circle cx="11" cy="11" r="6.5" />
-              <path d="m20 20-4-4" />
-            </svg>
-            <input name="q" type="search" defaultValue={q} placeholder="Order no., customer, mobile…" aria-label="Search orders" className={`${inputClass} pl-9`} />
-          </div>
+          <SearchField className="flex-1" defaultValue={q} placeholder="Order no., customer, mobile…" aria-label="Search orders" />
           <label
             htmlFor="order-filters"
-            className={`inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-sm font-medium ring-1 md:hidden ${
+            className={`inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-4 text-sm font-semibold ring-1 md:hidden ${
               activeFilters ? "bg-brand-50 text-brand-700 ring-brand-500" : "bg-white text-stone-700 ring-stone-300"
             }`}
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
-              <path d="M4 6h16M7 12h10M10 18h4" />
-            </svg>
+            <ListFilter aria-hidden="true" className="size-4" />
             Filters{activeFilters ? ` (${activeFilters})` : ""}
           </label>
-          {/* Phones submit with the keyboard's search key; the button shows from md up. */}
-          <span className="hidden md:block">
-            <button className={buttonClass("primary")}>Search</button>
-          </span>
         </div>
         <div className="mt-3 hidden gap-3 border-t border-stone-100 pt-3 peer-checked:grid md:grid md:grid-cols-[16rem_auto_auto] md:items-end md:justify-start md:border-0 md:pt-0">
           <label className="block min-w-0">
@@ -120,16 +108,13 @@ export default async function OrdersPage({
               <input name="to" type="date" defaultValue={to} className={`${inputClass} md:w-40`} />
             </label>
           </div>
-          <div className="flex gap-2 md:hidden">
-            <button className={buttonClass("primary", "flex-1")}>Apply</button>
-            {filtered && (
-              <Link href={`/app/orders?status=${tab}`} className={buttonClass("secondary")}>
-                Clear
-              </Link>
-            )}
-          </div>
+          {filtered && (
+            <Link href={`/app/orders?status=${tab}`} className={buttonClass("secondary", "md:hidden")}>
+              Clear filters
+            </Link>
+          )}
         </div>
-      </form>
+      </LiveForm>
 
       {filtered && (
         <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
@@ -140,7 +125,7 @@ export default async function OrdersPage({
               aria-label={`Remove filter: ${c.label}`}
               className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-stone-700 ring-1 ring-stone-300 hover:bg-stone-100"
             >
-              {c.label} <span aria-hidden="true">×</span>
+              {c.label} <X aria-hidden="true" className="size-3.5" />
             </Link>
           ))}
           <Link href={`/app/orders?status=${tab}`} className="text-stone-500 underline">
@@ -212,7 +197,11 @@ export default async function OrdersPage({
                   <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatRupees(o.grandTotal)}</td>
                   <td className="px-4 py-3 text-stone-600">
                     {PAYMENT_LABEL[o.paymentMode]}
-                    {o.paymentReceived && <span className="ml-1.5 text-xs font-medium text-green-700">✓ paid</span>}
+                    {o.paymentReceived && (
+                      <span className="ml-1.5 inline-flex items-center gap-0.5 text-xs font-medium text-green-700">
+                        <Check aria-hidden="true" className="size-3.5" /> paid
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <OrderStatusBadge status={o.status} />

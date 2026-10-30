@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { SubmitButton } from "@/components/submit-button";
 import {
@@ -37,14 +37,21 @@ export function ClientForm({
   action,
   plans,
   client,
+  onSaved,
 }: {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
   /** Present on create: the plan picker and the initial password are shown. */
   plans?: Plan[];
   /** Present on edit. */
   client?: ClientValues;
+  /** Inside a pop-up: sections without cards, and this runs after a successful save. */
+  onSaved?: (message?: string) => void;
 }) {
   const [state, formAction] = useActionState(action, {});
+  const flat = !!onSaved;
+  useEffect(() => {
+    if (state.ok) onSaved?.(state.message);
+  }, [state, onSaved]);
   const [password, setPassword] = useState("");
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const isCreate = !client;
@@ -53,10 +60,10 @@ export function ClientForm({
   const err = (name: string) => state.fieldErrors?.[name];
 
   return (
-    <form action={formAction} className="space-y-6 lg:space-y-10">
+    <form action={formAction} className="space-y-5">
       <FormError message={state.error} />
 
-      <FormSection title="Business" description="The client's business and owner details.">
+      <FormSection flat={flat} title="Business" description="The client's business and owner details.">
         <div className="grid gap-4 sm:grid-cols-2">
           <Input
             label="Business name"
@@ -116,7 +123,7 @@ export function ClientForm({
         </div>
       </FormSection>
 
-      <FormSection title="Logo" description="Shown on the client's catalog link.">
+      <FormSection flat={flat} title="Logo" description="Shown on the client's catalog link.">
         <div className="flex items-center gap-4">
           {logoPreview ? (
             // eslint-disable-next-line @next/next/no-img-element -- local preview of the chosen file
@@ -152,6 +159,7 @@ export function ClientForm({
 
       {isCreate && (
         <FormSection
+          flat={flat}
           title="Login & plan"
           description="The client logs in with this email and password, or with an OTP to the mobile."
         >
@@ -205,7 +213,7 @@ export function ClientForm({
       )}
 
       <FormActions>
-        <SubmitButton pendingText={isCreate ? "Creating…" : "Saving…"}>
+        <SubmitButton className="w-full sm:w-auto" pendingText={isCreate ? "Creating…" : "Saving…"}>
           {isCreate ? "Create client" : "Save changes"}
         </SubmitButton>
       </FormActions>

@@ -1,3 +1,4 @@
+import { Check, Download } from "lucide-react";
 import { fakeGoogleEnabled, oauthConfigured } from "@cataloglink/core/google";
 import { getPendingSync } from "@cataloglink/core/sync";
 import { prisma } from "@cataloglink/db";
@@ -99,7 +100,7 @@ function StepNumber({ n, done }: { n: number; done: boolean }) {
         done ? "bg-green-100 text-green-800" : "bg-brand-500 text-white"
       }`}
     >
-      {done ? "✓" : n}
+      {done ? <Check aria-hidden="true" className="size-4" /> : n}
     </span>
   );
 }
@@ -112,14 +113,31 @@ function Connect({ conn }: { conn: Awaited<ReturnType<typeof prisma.sheetConnect
 
   return (
     <div className="max-w-3xl space-y-4">
-      <p className="rounded-xl bg-stone-100 px-4 py-3 text-sm text-stone-700">
-        New to CatalogLink? Start from our{" "}
-        <a href="/api/v1/sheet-template" className="font-medium text-brand-700 underline">
-          sheet template (.xlsx)
-        </a>
-        : upload it to Google Drive and open it with Google Sheets. One row = one product, with Google Drive links to its photos in
-        the &quot;Image Links&quot; column.
-      </p>
+      <section className="rounded-2xl border border-stone-200 bg-stone-50 p-4 sm:p-5">
+        <h2 className="text-sm font-semibold">New to CatalogLink? Prepare your sheet first</h2>
+        <ol className="mt-3 space-y-3 text-sm text-stone-700">
+          {[
+            <>
+              Download our sheet template.{" "}
+              <a href="/api/v1/sheet-template" className="mt-1.5 flex w-fit items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 font-medium text-brand-700 hover:bg-stone-50">
+                <Download aria-hidden="true" className="size-4" /> Sheet template (.xlsx)
+              </a>
+            </>,
+            <>Upload it to Google Drive and open it with Google Sheets.</>,
+            <>
+              Add one row per product. Paste the Google Drive links of its photos in the{" "}
+              <span className="font-medium">&quot;Image Links&quot;</span> column.
+            </>,
+          ].map((body, i) => (
+            <li key={i} className="flex gap-3">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-stone-600 ring-1 ring-stone-300">
+                {i + 1}
+              </span>
+              <div className="min-w-0 pt-0.5">{body}</div>
+            </li>
+          ))}
+        </ol>
+      </section>
 
       <section className="rounded-2xl border border-stone-200 bg-white p-4 sm:p-5">
         <div className="flex gap-3">
@@ -308,7 +326,7 @@ async function Connected({
                   ? `/app/sheet/select?mode=OAUTH&id=${encodeURIComponent(conn.spreadsheetId!)}`
                   : `/app/sheet/select?mode=SERVICE_ACCOUNT&id=${encodeURIComponent(conn.spreadsheetId!)}`
               }
-              className="inline-flex h-10 items-center rounded-lg border border-stone-300 bg-white px-4 text-sm font-medium hover:bg-stone-50"
+              className="inline-flex h-10 items-center rounded-full border border-stone-300 bg-white px-4 text-sm font-semibold hover:bg-stone-50"
             >
               Choose another tab
             </Link>

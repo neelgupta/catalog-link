@@ -1,7 +1,8 @@
 import { listCustomers } from "@cataloglink/core/customers";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Badge, buttonClass, EmptyState, LinkButton, PageHeader } from "@/components/ui";
+import { LiveForm } from "@/components/live-form";
+import { Badge, buttonClass, EmptyState, LinkButton, PageHeader, SearchField } from "@/components/ui";
 import { requireClient } from "@/lib/auth";
 import { formatDate, formatRupees } from "@/lib/format";
 
@@ -27,18 +28,10 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
     <>
       <PageHeader title="Customers" subtitle={`${total} customer${total === 1 ? "" : "s"}`} action={<LinkButton href="/app/customers/new">Add customer</LinkButton>} />
 
-      <form action="/app/customers" className="mb-3 flex gap-2">
+      <LiveForm action="/app/customers" className="mb-3">
         {blocked && <input type="hidden" name="blocked" value="1" />}
-        <input
-          name="q"
-          type="search"
-          defaultValue={q}
-          placeholder="Search name, shop, city, mobile…"
-          aria-label="Search customers"
-          className="h-10 min-w-0 flex-1 rounded-lg border border-stone-300 bg-white px-3 text-base outline-none focus:border-brand-500 sm:text-sm"
-        />
-        <button className={buttonClass("secondary")}>Search</button>
-      </form>
+        <SearchField defaultValue={q} placeholder="Search name, shop, city, mobile…" aria-label="Search customers" />
+      </LiveForm>
       <div className="mb-4 flex gap-2">
         {[
           ["All", ""],

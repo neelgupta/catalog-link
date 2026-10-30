@@ -2,8 +2,11 @@ import { isClientAvailable } from "@cataloglink/core/subscriptions";
 import { prisma, type Prisma } from "@cataloglink/db";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { LiveForm } from "@/components/live-form";
+import { activePlans } from "@/lib/admin-data";
+import { AddClientDialog } from "./client-dialogs";
 import { Avatar } from "@/components/avatar";
-import { Badge, buttonClass, EmptyState, LinkButton, PageHeader } from "@/components/ui";
+import { Badge, buttonClass, EmptyState, PageHeader, SearchField } from "@/components/ui";
 import { requireSuperAdmin } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
 
@@ -21,7 +24,7 @@ type StatusFilter = keyof typeof STATUSES;
 export default async function ClientsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; page?: string; add?: string }>;
 }) {
   await requireSuperAdmin();
   const sp = await searchParams;
@@ -84,19 +87,13 @@ export default async function ClientsPage({
       <PageHeader
         title="Clients"
         subtitle={`${total} client${total === 1 ? "" : "s"}`}
-        action={<LinkButton href="/admin/clients/new">Add client</LinkButton>}
+        action={<AddClientDialog plans={await activePlans()} initiallyOpen={sp.add === "1"} />}
       />
 
-      <form className="mb-3 flex gap-2" action="/admin/clients">
+      <LiveForm className="mb-3" action="/admin/clients">
         {status !== "all" && <input type="hidden" name="status" value={status} />}
-        <input
-          name="q"
-          defaultValue={q}
-          placeholder="Search name, mobile, email, city…"
-          className="h-10 min-w-0 flex-1 rounded-lg border border-stone-300 bg-white px-3 text-base outline-none focus:border-brand-500 sm:text-sm"
-        />
-        <button className={buttonClass("secondary")}>Search</button>
-      </form>
+        <SearchField defaultValue={q} placeholder="Search name, mobile, email, city…" aria-label="Search clients" />
+      </LiveForm>
 
       <div className="mb-4 flex gap-2 overflow-x-auto">
         {(Object.keys(STATUSES) as StatusFilter[]).map((s) => (

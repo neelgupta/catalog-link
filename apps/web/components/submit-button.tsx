@@ -10,6 +10,7 @@ export function SubmitButton({
   variant,
   className,
   confirm,
+  disabled = false,
 }: {
   children: React.ReactNode;
   pendingText?: string;
@@ -17,6 +18,7 @@ export function SubmitButton({
   className?: string;
   /** Ask for confirmation in a browser dialog before submitting. */
   confirm?: string;
+  disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
   return (
@@ -24,7 +26,7 @@ export function SubmitButton({
       type="submit"
       variant={variant}
       className={className}
-      disabled={pending}
+      disabled={pending || disabled}
       onClick={confirm ? (e) => !window.confirm(confirm) && e.preventDefault() : undefined}
     >
       {pending ? pendingText : children}

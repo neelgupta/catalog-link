@@ -37,7 +37,7 @@ export async function updatePlanAction(planId: string, _prev: ActionState, formD
     return errorState(err, values);
   }
   revalidatePath("/admin/plans");
-  redirect("/admin/plans");
+  return { ok: true, message: `Plan "${parsed.data.name}" saved.` };
 }
 
 export async function deletePlanAction(planId: string): Promise<ActionState> {
@@ -48,5 +48,6 @@ export async function deletePlanAction(planId: string): Promise<ActionState> {
     return errorState(err);
   }
   revalidatePath("/admin/plans");
-  redirect("/admin/plans");
+  // The plan's card (and its pop-up) disappears, so the message is shown by the page.
+  redirect("/admin/plans?notice=deleted");
 }

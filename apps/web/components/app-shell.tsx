@@ -68,7 +68,7 @@ export function AppShell({
               </div>
             </div>
             <form action={logout}>
-              <button type="submit" className="rounded-lg px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100">
+              <button type="submit" className="shrink-0 rounded-full px-3 py-1.5 text-sm whitespace-nowrap text-stone-600 hover:bg-stone-100">
                 Log out
               </button>
             </form>

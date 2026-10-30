@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { SubmitButton } from "@/components/submit-button";
-import { Badge, Card, Detail, EmptyState, FormSuccess, LinkButton, PageHeader } from "@/components/ui";
+import { Badge, Card, Detail, EmptyState, FormSuccess, PageHeader } from "@/components/ui";
 import { requireSuperAdmin } from "@/lib/auth";
 import { dateInputValue, formatDate, formatDateTime, formatRupees } from "@/lib/format";
 import {
@@ -15,6 +15,7 @@ import {
   resetPasswordAction,
   setClientStatusAction,
 } from "../actions";
+import { EditClientDialog } from "../client-dialogs";
 import { AssignPlanForm, DeleteClientForm, PaymentForm, ResetPasswordForm } from "./forms";
 import { publicBaseUrl } from "@/lib/public-url";
 
@@ -34,11 +35,11 @@ export default async function ClientDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ notice?: string }>;
+  searchParams: Promise<{ notice?: string; edit?: string }>;
 }) {
   await requireSuperAdmin();
   const { id } = await params;
-  const { notice } = await searchParams;
+  const { notice, edit } = await searchParams;
 
   const client = await prisma.client.findUnique({
     where: { id },
@@ -86,7 +87,20 @@ export default async function ClientDetailPage({
         }
         action={
           <div className="flex flex-wrap gap-2">
-            <LinkButton href={`/admin/clients/${id}/edit`} variant="secondary">Edit</LinkButton>
+            <EditClientDialog
+              clientId={id}
+              initiallyOpen={edit === "1"}
+              client={{
+                businessName: client.businessName,
+                ownerName: client.ownerName,
+                mobile: client.mobile,
+                email: client.email,
+                gst: client.gst,
+                city: client.city,
+                address: client.address,
+                logoUrl: client.logoUrl,
+              }}
+            />
             {owner && (
               <form action={impersonateClientAction.bind(null, id)}>
                 <SubmitButton variant="secondary" pendingText="Opening…">Login as client</SubmitButton>

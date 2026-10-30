@@ -13,7 +13,7 @@ export default async function CartPage({ params }: { params: Promise<{ slug: str
   return (
     <div className="min-h-dvh bg-stone-50">
       <CatalogHeader ctx={ctx} url={`${await publicBaseUrl()}/c/${ctx.link.slug}`} compact />
-      <main className="mx-auto max-w-3xl px-4 py-5">
+      <main className="mx-auto max-w-3xl px-4 pt-5 pb-28 sm:pb-5">
         <h1 className="mb-4 text-xl font-semibold">Your cart</h1>
         <CartView slug={ctx.link.slug} linkId={ctx.link.id} />
       </main>

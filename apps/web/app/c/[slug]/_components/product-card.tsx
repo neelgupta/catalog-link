@@ -45,6 +45,11 @@ export function ProductCard({
           </span>
         )}
         <div className="absolute top-2 left-2 flex flex-col items-start gap-1">
+          {p.discountLabel && (
+            <span className="rounded-full bg-green-600 px-2 py-0.5 text-[11px] font-semibold text-white">
+              {p.discountLabel}
+            </span>
+          )}
           {p.isNew && (
             <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[11px] font-semibold text-white">
               New
@@ -68,15 +73,20 @@ export function ProductCard({
           <p className="text-sm">
             <span className="font-semibold">{rupees(p.price)}</span>
             <span className="text-xs text-stone-500"> / {unitLabel(p.priceType)}</span>
-            {p.mrp !== null && p.mrp > p.price && (
-              <span className="ml-1.5 text-xs text-stone-400 line-through">{rupees(p.mrp)}</span>
+            {p.listPrice !== null ? (
+              <span className="ml-1.5 text-xs text-stone-400 line-through">{rupees(p.listPrice)}</span>
+            ) : (
+              p.mrp !== null &&
+              p.mrp > p.price && (
+                <span className="ml-1.5 text-xs text-stone-400 line-through">{rupees(p.mrp)}</span>
+              )
             )}
           </p>
         ) : (
           <p className="text-sm font-medium text-brand-700">Price on request</p>
         )}
         <p className="truncate text-xs text-stone-500">
-          {p.piecesPerSet ? `Set of ${p.piecesPerSet} · ` : ""}MOQ {qtyLabel(p.moq, p.priceType)}
+          {p.piecesPerSet ? `Set of ${p.piecesPerSet} · ` : ""}Min. {qtyLabel(p.moq, p.priceType)}
         </p>
       </div>
     </Link>

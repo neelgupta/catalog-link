@@ -19,6 +19,10 @@ For setup see [README.md](../README.md); for how things work see [IMPLEMENTATION
 **On hold by request:** notifications (email alerts, WhatsApp message templates, SMTP, the "send login details" button). OTP SMS for login is built.
 **Removed by request:** OneDrive images. Photos come from Google Drive only.
 
+## Future plan (paused)
+
+- **Photos straight from Drive folders (no image links in the sheet).** The seller links one parent folder with a sub-folder per category (Kurti, Saree…), holding photos named after the product ("Banarasi Silk Saree 01.jpg"). Each sync matches photos to products by Category + Name, falling back to the SKU, and orders them by the trailing number. Image Links stays optional and overrides when filled. Products without photos, and photos that match no product, are reported on the sync page. Planned work: a new `imagesFolderId` on the sheet connection, step 3 "Link photos folder" on the connect screen, a sub-folder listing in the Google service, and a name matcher with tests.
+
 ---
 
 ## Features done
@@ -160,6 +164,26 @@ For setup see [README.md](../README.md); for how things work see [IMPLEMENTATION
 
 ---
 
+### Customer UI simplified (phone first)
+- One sticky top bar on every page: logo + name (tap for home), WhatsApp, Cart. "Call" and "My orders" moved to the footer; a "You have N orders from this phone" strip shows on the home page only when there are orders.
+- Home: one search box + one **Filters** button (bottom sheet: sort, top 10 colours, price, new arrivals, in stock; applies on "Show designs") and one-tap category chips.
+- Product page: the total and **Add to cart** sit in a bar at the bottom of the screen; tapping it without a colour/size scrolls there and says "Please choose a colour". WhatsApp is a small "Ask on WhatsApp" link; the details list is trimmed; "MOQ" now reads "Min.".
+- Cart: total + **Place Order** in a bottom bar. My orders: orders placed on this phone first; the OTP lookup is behind "Ordered from another phone?".
+- Dashboards: the number cards are links (client: New orders, Products on link, Out of stock, Custom links, Last sync; admin: Clients, Active clients). Link names on the Links page open the link.
+- Google Sheet page: the intro is three "Prepare your sheet" steps with a template download button. Plans: an "Add plan" button opens the new-plan form in a pop-up.
+- The site has a favicon (`app/icon.svg`).
+- Icons come from **Lucide React** (`lucide-react` 1.64.0); only the WhatsApp logo is a custom SVG (Lucide has no brand logos).
+- Search runs while typing everywhere (admin Clients, Products, Orders, Customers, the shop): `components/live-form.tsx` updates the URL in place after a short pause; dropdowns and dates apply at once. The shop's Filters sheet still applies on "Show designs".
+- **Catalogs hidden for now** (`SHOW_CATALOGS` in `apps/web/lib/features.ts`): no Catalogs strip in the shop and no "By catalog" choice for new links. Product pages go back to "All products" and suggest more from the same category. Links already made "By catalog" keep working. Set it to true to bring catalogs back.
+- New link is a three-step form with a progress bar (Name → Products → Options); steps switch without reloading and everything is saved at the end. Editing a link uses the same steps, any step can be opened, and "Save link" works from every step.
+- One look for forms and buttons: pill-shaped buttons, rounded fields, bigger checkboxes, and form cards with the title on top (Profile, Settings, Customer, Client and Link forms). The shop footer shows the seller, address, GSTIN and WhatsApp / Call / My orders buttons.
+- **Link discounts** (custom links only; migration `20261030120930_link_pricing`): a "Prices" step in the link form (Name → Products → Prices → Options) with No discount / All products / Selected products (one discount) / Product by product. Each discount is a % (below 100) or a ₹ amount; discounts only, never above the sheet price, and a ₹ discount that would make a product free is refused. Shop, cart and checkout use the link price and show the sheet price crossed out with a "10% off" tag; % results are rounded to whole rupees when the sheet price is whole. Order items keep the sheet price (`OrderItem.listPrice`), shown as "was ₹…" on the PO slip (web and PDF) and the order pages. Logic in `packages/core/src/link-pricing.ts`.
+- Super Admin pop-ups: Add client, Edit client and Edit plan open in pop-ups (`components/modal.tsx`) instead of new pages; the old addresses (`/admin/clients/new`, `/admin/clients/{id}/edit`, `/admin/plans/{id}`) open the same pop-ups.
+- Links "By category" list the category's products, all ticked. Unticking some saves the link as the ticked products (the form warns that new products in the category then aren't added automatically). Product lists have a "Select all" tick-box that works on the products shown (also after a search).
+- Deleting a client: a "Delete client" button opens a pop-up (`components/modal.tsx`) where the business name must be typed before "Delete permanently" turns on (the server checks it too).
+- Back buttons everywhere use one shared `BackLink` (rounded chip with an arrow).
+- The Next.js dev "N" badge is turned off (it covered the bottom buttons on phones).
+
 ## Versions
 
 ### Runtime and services
@@ -200,6 +224,7 @@ Migrations applied:
 | tailwindcss / @tailwindcss/postcss | 4.3.3 |
 | jose | 6.2.13 |
 | zod | 4.6.7 |
+| lucide-react | 1.64.0 |
 | eslint / eslint-config-next | 10.13.0 / 16.4.3 |
 
 ### Worker and shared logic (`apps/worker`, `packages/core`)

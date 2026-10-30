@@ -4,9 +4,10 @@ import { forClient, type Prisma } from "@cataloglink/db";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ProductThumb } from "@/components/product-thumb";
-import { buttonClass, EmptyState, LinkButton, PageHeader } from "@/components/ui";
+import { buttonClass, EmptyState, LinkButton, PageHeader, SearchField } from "@/components/ui";
 import { requireClient } from "@/lib/auth";
 import { formatDateTime, formatPrice } from "@/lib/format";
+import { LiveForm } from "@/components/live-form";
 import { FilterSelect } from "./filter-select";
 import { HideToggle } from "./hide-toggle";
 import { isOnLinks, priceUnit } from "./product-status";
@@ -128,30 +129,16 @@ export default async function ProductsPage({
         }
       />
 
-      <form action="/app/products" className="mb-4 rounded-2xl border border-stone-200 bg-white p-3 sm:p-4">
+      <LiveForm action="/app/products" className="mb-4 rounded-2xl border border-stone-200 bg-white p-3 sm:p-4">
         {/* Keep the status chip's filter when searching or picking a category. */}
         {stock !== "all" && <input type="hidden" name="stock" value={stock} />}
         {show !== "all" && <input type="hidden" name="show" value={show} />}
-        <div className="grid gap-2 md:grid-cols-[1fr_auto_auto_auto]">
-          <div className="relative min-w-0">
-            <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-stone-400" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
-              <circle cx="11" cy="11" r="6.5" />
-              <path d="m20 20-4-4" />
-            </svg>
-            <input
-              name="q"
-              type="search"
-              defaultValue={q}
-              placeholder="Search name, SKU, fabric…"
-              aria-label="Search products"
-              className="h-10 w-full rounded-lg border border-stone-300 bg-white pr-3 pl-9 text-base outline-none focus:border-brand-500 sm:text-sm"
-            />
-          </div>
+        <div className="grid gap-2 md:grid-cols-[1fr_auto_auto]">
+          <SearchField defaultValue={q} placeholder="Search name, SKU, fabric…" aria-label="Search products" />
           <div className="grid grid-cols-2 gap-2 md:contents">
             <FilterSelect name="category" value={category} label="Category" allLabel="All categories" options={facets.categories.map((c) => [c.name, `${c.name} (${c.count})`])} />
             <FilterSelect name="catalog" value={catalog} label="Catalog" allLabel="All catalogs" options={facets.catalogs.map((c) => [c.name, `${c.name} (${c.count})`])} />
           </div>
-          <button className={buttonClass("primary", "w-full md:w-auto")}>Search</button>
         </div>
         <nav aria-label="Product status" className="no-scrollbar -mx-1 mt-3 flex gap-2 overflow-x-auto px-1">
           {chips.map((c) => {
@@ -171,7 +158,7 @@ export default async function ProductsPage({
             );
           })}
         </nav>
-      </form>
+      </LiveForm>
 
       <div className="mb-3 flex items-center justify-between text-sm text-stone-500">
         <span>{filtered ? `${total} of ${all} products` : `${all} products`}</span>

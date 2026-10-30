@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { SubmitButton } from "@/components/submit-button";
 import { Checkbox, FormError, FormSuccess, Input } from "@/components/ui";
 import type { ActionState } from "@/lib/actions";
@@ -31,12 +31,18 @@ export function PlanForm({
   action,
   plan,
   submitLabel,
+  onSaved,
 }: {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
   plan?: PlanValues;
   submitLabel: string;
+  /** Called after a successful save (the pop-up closes itself with it). */
+  onSaved?: (message?: string) => void;
 }) {
   const [state, formAction] = useActionState(action, {});
+  useEffect(() => {
+    if (state.ok) onSaved?.(state.message);
+  }, [state, onSaved]);
   const base = plan ?? DEFAULTS;
   // After a successful create, the form goes back to the defaults.
   const v = (k: keyof PlanValues) => (state.ok ? String(DEFAULTS[k]) : (state.values?.[k] ?? String(base[k])));
@@ -44,7 +50,7 @@ export function PlanForm({
 
   return (
     <form action={formAction} className="space-y-4" key={state.ok ? state.message : "form"}>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <Input label="Plan name" name="name" defaultValue={v("name")} error={e("name")} required />
         </div>
@@ -60,7 +66,7 @@ export function PlanForm({
       <Checkbox name="isActive" label="Active (can be assigned to clients)"
         defaultChecked={state.values ? state.values.isActive === "on" : base.isActive} />
       <FormError message={state.error} />
-      <FormSuccess message={state.message} />
+      {!onSaved && <FormSuccess message={state.message} />}
       <SubmitButton>{submitLabel}</SubmitButton>
     </form>
   );

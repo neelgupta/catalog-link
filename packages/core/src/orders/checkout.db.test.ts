@@ -202,3 +202,63 @@ describe("plan order limit (Postgres)", () => {
     expect(await domainCode(one())).toBe("ORDER_LIMIT");
   });
 });
+
+describe("link discounts (Postgres)", () => {
+  let c: Awaited<ReturnType<typeof makeClient>>;
+  const ids: Record<string, string> = {};
+
+  beforeAll(async () => {
+    c = await makeClient("Pricing");
+    ids.saree = (await product(c.id, "PR-1", { price: 1000 })).id;
+    ids.kurti = (await product(c.id, "PR-2", { price: 40, category: "Kurti" })).id;
+  });
+
+  const makeLink = (name: string, pricing: object, extra: object = {}) =>
+    createLink(c.id, linkCreateSchema.parse({ name, selectionType: "ALL", selectionValues: [], showPrice: "on", allowOrdering: "on", isActive: "on", pricing: JSON.stringify(pricing), ...extra }));
+
+  it("10% off everything: the shop, the cart and the order all use the link price; the order keeps the sheet price", async () => {
+    const link = await makeLink("Ten off", { mode: "ALL", discount: { kind: "PERCENT", value: 10 } });
+    const ctx = (await resolveCatalogLink(link.slug))!;
+    const cart = await validateCart(ctx, [{ productId: ids.saree!, qty: 2, price: 900 }]);
+    expect(cart.lines[0]).toMatchObject({ unitPrice: 900, listPrice: 1000, lineTotal: 1800, issues: [] });
+
+    const placed = await placeOrder(ctx, "9811111111", order([{ productId: ids.saree!, qty: 2, price: 900 }]));
+    const item = await prisma.orderItem.findFirstOrThrow({ where: { orderId: placed.id } });
+    expect(Number(item.unitPrice)).toBe(900);
+    expect(Number(item.listPrice)).toBe(1000);
+    expect(Number(placed.subtotal)).toBe(1800);
+  });
+
+  it("a cart that saw the sheet price is told the price changed", async () => {
+    const link = await makeLink("Ten off again", { mode: "ALL", discount: { kind: "PERCENT", value: 10 } });
+    const ctx = (await resolveCatalogLink(link.slug))!;
+    const cart = await validateCart(ctx, [{ productId: ids.saree!, qty: 2, price: 1000 }]);
+    expect(cart.lines[0]!.issues).toContain("price_changed");
+  });
+
+  it("selected products only: the others keep the sheet price and have no list price", async () => {
+    const link = await makeLink("Group", { mode: "GROUP", discount: { kind: "AMOUNT", value: 100 }, productIds: [ids.saree] });
+    const ctx = (await resolveCatalogLink(link.slug))!;
+    const cart = await validateCart(ctx, [
+      { productId: ids.saree!, qty: 2 },
+      { productId: ids.kurti!, qty: 2 },
+    ]);
+    expect(cart.lines.map((l) => [l.unitPrice, l.listPrice])).toEqual([
+      [900, 1000],
+      [40, null],
+    ]);
+  });
+
+  it("refuses a ₹ discount that would make a product free, and drops discounts for unknown products", async () => {
+    expect(await domainCode(makeLink("Too big", { mode: "ALL", discount: { kind: "AMOUNT", value: 50 } }))).toBe("DISCOUNT_TOO_BIG");
+    const link = await makeLink("Each", { mode: "EACH", discounts: { [ids.saree!]: { kind: "PERCENT", value: 5 }, not_a_product: { kind: "PERCENT", value: 5 } } });
+    const stored = await prisma.catalogLink.findUniqueOrThrow({ where: { id: link.id } });
+    expect(Object.keys((stored.pricing as { discounts: object }).discounts)).toEqual([ids.saree]);
+  });
+
+  it("the default link always uses sheet prices", async () => {
+    const ctx = (await resolveCatalogLink(c.slug))!;
+    const cart = await validateCart(ctx, [{ productId: ids.saree!, qty: 2 }]);
+    expect(cart.lines[0]).toMatchObject({ unitPrice: 1000, listPrice: null });
+  });
+});

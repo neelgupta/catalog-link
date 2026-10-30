@@ -30,6 +30,52 @@ export const linkSlugSchema = z
 
 export const LINK_SELECTION_TYPES = ["ALL", "CATEGORY", "CATALOG", "PRODUCTS"] as const;
 
+// ───────────────────────────── Link pricing ─────────────────────────────
+
+/** Link-only discounts. Discounts only: a link can't raise prices above the sheet price. */
+export const LINK_PRICING_MODES = ["NONE", "ALL", "GROUP", "EACH"] as const;
+export const DISCOUNT_KINDS = ["PERCENT", "AMOUNT"] as const;
+
+export const discountSchema = z
+  .object({
+    kind: z.enum(DISCOUNT_KINDS),
+    value: z.coerce.number({ error: "Enter a number" }).positive("Enter a discount above 0"),
+  })
+  .refine((d) => d.kind !== "PERCENT" || d.value < 100, { path: ["value"], message: "A % discount must be below 100" });
+export type Discount = z.infer<typeof discountSchema>;
+
+export const linkPricingSchema = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("NONE") }),
+  /** One discount for every product on the link. */
+  z.object({ mode: z.literal("ALL"), discount: discountSchema }),
+  /** One discount for the chosen products; the rest keep the sheet price. */
+  z.object({
+    mode: z.literal("GROUP"),
+    discount: discountSchema,
+    productIds: z.array(z.string().min(1).max(40)).min(1, "Pick at least one product for the discount").max(1000),
+  }),
+  /** Each chosen product has its own discount. */
+  z.object({
+    mode: z.literal("EACH"),
+    discounts: z
+      .record(z.string().min(1).max(40), discountSchema)
+      .refine((m) => Object.keys(m).length > 0, "Give at least one product a discount")
+      .refine((m) => Object.keys(m).length <= 1000, "Too many products"),
+  }),
+]);
+export type LinkPricing = z.infer<typeof linkPricingSchema>;
+
+/** The form sends the pricing as one JSON string. */
+const pricingField = z.preprocess((v) => {
+  if (v === undefined || v === null || v === "") return { mode: "NONE" };
+  if (typeof v !== "string") return v;
+  try {
+    return JSON.parse(v);
+  } catch {
+    return v;
+  }
+}, linkPricingSchema);
+
 const linkFields = {
   name: text("Link name", 60),
   selectionType: z.enum(LINK_SELECTION_TYPES, { error: "Choose which products to show" }),
@@ -38,6 +84,7 @@ const linkFields = {
   showPrice: checkbox,
   allowOrdering: checkbox,
   isActive: checkbox,
+  pricing: pricingField,
 };
 
 const needsValues = (v: { selectionType: string; selectionValues: string[] }) =>

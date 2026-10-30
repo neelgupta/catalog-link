@@ -1,9 +1,11 @@
+import { CircleCheck } from "lucide-react";
 import { getEnv } from "@cataloglink/core/env";
 import { CUSTOMER_STATUS, getCustomerOrder, OPEN_STATUSES, PAYMENT_MODE_LABEL, SIMPLE_ORDER_FLOW } from "@cataloglink/core/orders";
 import { parseBankDetails } from "@cataloglink/core/profile";
 import { prisma } from "@cataloglink/db";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BackLink } from "@/components/ui";
 import { notFound } from "next/navigation";
 import { getCustomerSession } from "@/lib/auth";
 import { getCatalogContext } from "@/lib/catalog";
@@ -62,9 +64,7 @@ export default async function OrderPage({ params, searchParams }: Props) {
     <div className="min-h-dvh bg-stone-50">
       {header}
       <main className="mx-auto max-w-3xl space-y-4 px-4 py-5">
-        <Link href={`${base}/orders`} className="text-sm text-stone-500 hover:text-stone-800">
-          ← My orders
-        </Link>
+        <BackLink href={`${base}/orders`} label="My orders" />
 
         {placed && !closed && (
           <div role="status" className="rounded-2xl bg-green-50 p-4 text-green-900 ring-1 ring-green-200">
@@ -123,7 +123,14 @@ export default async function OrderPage({ params, searchParams }: Props) {
                   <p className="text-xs text-stone-500">{[i.sku, i.colour, i.size && `Size ${i.size}`].filter(Boolean).join(" · ")}</p>
                   <p className="mt-1 text-stone-600">
                     {qtyLabel(i.qty, i.priceType)}
-                    {showPrice && ` × ${rupees(Number(i.unitPrice))} / ${unitLabel(i.priceType)}`}
+                    {showPrice && (
+                      <>
+                        {" × "}
+                        {i.listPrice !== null && <span className="text-stone-400 line-through">{rupees(Number(i.listPrice))}</span>}{" "}
+                        <span className={i.listPrice !== null ? "font-medium text-green-700" : ""}>{rupees(Number(i.unitPrice))}</span> /{" "}
+                        {unitLabel(i.priceType)}
+                      </>
+                    )}
                   </p>
                 </div>
                 {showPrice && <span className="shrink-0 text-sm font-semibold">{rupees(Number(i.lineTotal))}</span>}
@@ -168,7 +175,7 @@ export default async function OrderPage({ params, searchParams }: Props) {
           <div className="space-y-2 rounded-2xl bg-white p-4 ring-1 ring-stone-200">
             <h2 className="text-base font-semibold">Payment: {PAYMENT_MODE_LABEL[order.paymentMode]}</h2>
             {order.paymentReceived ? (
-              <p className="text-sm font-medium text-green-700">Payment received ✓</p>
+              <p className="flex items-center gap-1 text-sm font-medium text-green-700"><CircleCheck aria-hidden="true" className="size-4" /> Payment received</p>
             ) : (
               !closed && <PaymentDetails mode={order.paymentMode} payment={{ upiId: client.upiId, upiQrUrl: client.upiQrUrl, bank: parseBankDetails(client.bankDetails) }} />
             )}

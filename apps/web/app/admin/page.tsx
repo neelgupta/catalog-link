@@ -2,7 +2,9 @@ import { getAdminDashboard } from "@cataloglink/core/admin-stats";
 import { daysLeft } from "@cataloglink/core/subscriptions";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Badge, Card, EmptyState, LinkButton, PageHeader, Stat } from "@/components/ui";
+import { activePlans } from "@/lib/admin-data";
+import { AddClientDialog } from "./clients/client-dialogs";
+import { Badge, Card, EmptyState, PageHeader, Stat } from "@/components/ui";
 import { requireSuperAdmin } from "@/lib/auth";
 import { formatDate, formatDateTime } from "@/lib/format";
 
@@ -14,11 +16,11 @@ export default async function AdminDashboard() {
 
   return (
     <>
-      <PageHeader title="Dashboard" action={<LinkButton href="/admin/clients/new">Add client</LinkButton>} />
+      <PageHeader title="Dashboard" action={<AddClientDialog plans={await activePlans()} />} />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-        <Stat label="Clients" value={d.totalClients} />
-        <Stat label="Active clients" value={d.activeClients} />
+        <Stat label="Clients" value={d.totalClients} href="/admin/clients" />
+        <Stat label="Active clients" value={d.activeClients} href="/admin/clients?status=active" />
         <Stat label="Catalog links" value={d.links} />
         <Stat label="Orders today" value={d.ordersToday} />
         <Stat label="Orders this month" value={d.ordersMonth} />

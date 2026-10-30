@@ -25,6 +25,7 @@
     "./images": "./src/images/process.ts",
     "./profile": "./src/profile.ts",
     "./links": "./src/links.ts",
+    "./link-pricing": "./src/link-pricing.ts",
     "./products": "./src/products.ts",
     "./qr": "./src/qr.ts",
     "./catalog": "./src/catalog.ts",

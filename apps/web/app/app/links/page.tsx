@@ -8,6 +8,7 @@ import {
 import { forClient, prisma } from "@cataloglink/db";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { discountLabel, parseLinkPricing } from "@cataloglink/core/link-pricing";
 import { Badge, buttonClass, FormSuccess, LinkButton, PageHeader } from "@/components/ui";
 import { requireClient } from "@/lib/auth";
 import { ShareButtons } from "./share-buttons";
@@ -84,10 +85,23 @@ export default async function LinksPage({
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="font-semibold">{link.name}</h2>
+                    <h2 className="font-semibold">
+                      <Link href={`/app/links/${link.id}`} className="hover:text-brand-700 hover:underline">
+                        {link.name}
+                      </Link>
+                    </h2>
                     {link.isDefault && <Badge tone="blue">Default</Badge>}
                     {!link.isActive && <Badge tone="stone">Off</Badge>}
                     {!link.showPrice && <Badge tone="amber">Price hidden</Badge>}
+                    {(() => {
+                      const pricing = parseLinkPricing(link.pricing);
+                      if (link.isDefault || pricing.mode === "NONE") return null;
+                      return (
+                        <Badge tone="green">
+                          {pricing.mode === "ALL" ? discountLabel(pricing.discount) : pricing.mode === "GROUP" ? "Discount on some" : "Discounts"}
+                        </Badge>
+                      );
+                    })()}
                     {!link.allowOrdering && <Badge tone="amber">Ordering off</Badge>}
                   </div>
                   <p className="mt-1 text-sm text-stone-500">

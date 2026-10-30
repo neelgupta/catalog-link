@@ -1,6 +1,6 @@
 "use client";
 
-/** A filter dropdown that applies itself as soon as it changes (the form still works without JS via Search). */
+/** A filter dropdown; the surrounding LiveForm applies it as soon as it changes. */
 export function FilterSelect({
   name,
   value,
@@ -19,8 +19,7 @@ export function FilterSelect({
       name={name}
       defaultValue={value}
       aria-label={label}
-      onChange={(e) => e.currentTarget.form?.requestSubmit()}
-      className="h-10 w-full min-w-0 rounded-lg border border-stone-300 bg-white px-2 text-base outline-none focus:border-brand-500 sm:text-sm"
+      className="h-10 w-full min-w-0 rounded-xl border border-stone-300 bg-white px-2 text-base outline-none focus:border-brand-500 sm:text-sm"
     >
       <option value="">{allLabel}</option>
       {options.map(([v, text]) => (

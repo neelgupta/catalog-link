@@ -5,6 +5,7 @@ import type { CatalogContext } from "../catalog";
 import { DomainError } from "../errors";
 import { linkProductWhere, VISIBLE_PRODUCT } from "../links";
 import { getCurrentSubscription } from "../subscriptions";
+import { priceOnLink } from "../link-pricing";
 import { type CartLine, type CartProduct, type PricedLine, priceCart } from "./cart";
 
 type Tx = Prisma.TransactionClient;
@@ -27,7 +28,16 @@ async function linkProducts(db: Tx, ctx: CatalogContext, ids: string[]): Promise
     },
     include: { images: { where: { status: "READY" }, orderBy: { position: "asc" }, take: 1, select: { thumbUrl: true } } },
   });
-  return rows.map((p) => ({ ...p, imageUrl: p.images[0]?.thumbUrl ?? null }));
+  // Prices are the link's prices: a custom link may lower them (core/link-pricing.ts).
+  return rows.map((p) => {
+    const onLink = priceOnLink(ctx.link.pricing, p.id, Number(p.price));
+    return {
+      ...p,
+      price: onLink.listPrice === null ? p.price : new Prisma.Decimal(onLink.price),
+      listPrice: onLink.listPrice === null ? null : p.price,
+      imageUrl: p.images[0]?.thumbUrl ?? null,
+    };
+  });
 }
 
 const productIds = (lines: { productId: string }[]) => [...new Set(lines.map((l) => l.productId))];
@@ -153,6 +163,7 @@ async function placeOrderOnce(ctx: CatalogContext, input: CheckoutInput, now: Da
               size: l.size ?? null,
               priceType: l.priceType,
               unitPrice: l.unitPrice,
+              listPrice: l.listPrice,
               gstPct: l.gstPct,
               qty: l.qty,
               lineTotal: l.lineTotal,

@@ -18,6 +18,8 @@ const nextConfig: NextConfig = {
   // Development only: let phones and other computers on the local network load the dev server's
   // scripts (Next.js only allows localhost by default). Ignored in production.
   allowedDevOrigins: ["192.168.*.*", "10.*.*.*", "172.16.*.*", "*.local"],
+  // The floating "N" dev badge covers the bottom buttons on phones; build errors still show.
+  devIndicators: false,
   turbopack: {
     root: repoRoot,
   },

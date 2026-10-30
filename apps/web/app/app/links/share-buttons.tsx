@@ -29,7 +29,7 @@ export function ShareButtons({ linkId, url, whatsappUrl }: { linkId: string; url
         >
           {copied ? "Copied" : "Copy link"}
         </Button>
-        <a href={whatsappUrl} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center justify-center rounded-lg bg-[#1f8f4e] px-3 text-sm font-medium text-white transition hover:bg-[#187a42]">
+        <a href={whatsappUrl} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center justify-center rounded-full bg-[#1f8f4e] px-4 text-sm font-semibold text-white transition hover:bg-[#187a42]">
           Share on WhatsApp
         </a>
         <Button type="button" variant="secondary" className="h-9 px-3" aria-expanded={showQr} onClick={() => setShowQr((v) => !v)}>

@@ -1,9 +1,10 @@
+import { CircleCheck } from "lucide-react";
 import { getOrder, STATUS_LABEL } from "@cataloglink/core/orders";
 import { getClientSettings } from "@cataloglink/core/profile";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Card, PageHeader } from "@/components/ui";
+import { buttonClass, Card, PageHeader } from "@/components/ui";
 import { requireClient } from "@/lib/auth";
 import { formatDateTime, formatRupees } from "@/lib/format";
 import { OrderStatusBadge, PAYMENT_LABEL } from "../status-badge";
@@ -31,10 +32,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         subtitle={`Placed ${formatDateTime(order.createdAt)}${order.link ? ` on “${order.link.name}”` : ""}`}
         action={
           <div className="flex flex-wrap gap-2">
-            <a href={pdf("order")} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center rounded-lg border border-stone-300 bg-white px-3 text-sm font-medium hover:bg-stone-50">
+            <a href={pdf("order")} target="_blank" rel="noreferrer" className={buttonClass("secondary")}>
               PO slip
             </a>
-            <a href={pdf("packing")} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center rounded-lg border border-stone-300 bg-white px-3 text-sm font-medium hover:bg-stone-50">
+            <a href={pdf("packing")} target="_blank" rel="noreferrer" className={buttonClass("secondary")}>
               Packing slip
             </a>
           </div>
@@ -65,7 +66,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                     </p>
                     <p className="text-xs text-stone-500">{[i.sku, i.colour, i.size && `Size ${i.size}`].filter(Boolean).join(" · ")}</p>
                     <p className="mt-1 text-stone-600">
-                      {i.qty} {i.priceType === "SET" ? (i.qty === 1 ? "set" : "sets") : i.qty === 1 ? "piece" : "pieces"} × {formatRupees(i.unitPrice)}
+                      {i.qty} {i.priceType === "SET" ? (i.qty === 1 ? "set" : "sets") : i.qty === 1 ? "piece" : "pieces"} ×{" "}
+                      {i.listPrice !== null && <span className="text-stone-400 line-through">{formatRupees(i.listPrice)}</span>}{" "}
+                      <span className={i.listPrice !== null ? "font-medium text-green-700" : ""}>{formatRupees(i.unitPrice)}</span>
                       {i.gstPct ? <span className="text-stone-400"> + {Number(i.gstPct)}% GST</span> : null}
                     </p>
                   </div>
@@ -164,7 +167,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           <Card title="Payment">
             <p className="text-sm">
               {PAYMENT_LABEL[order.paymentMode]} ·{" "}
-              {order.paymentReceived ? <span className="font-medium text-green-700">Received ✓</span> : <span className="text-stone-600">Not received yet</span>}
+              {order.paymentReceived ? <span className="inline-flex items-center gap-1 font-medium text-green-700"><CircleCheck aria-hidden="true" className="size-4" /> Received</span> : <span className="text-stone-600">Not received yet</span>}
             </p>
             {!closed && (
               <div className="mt-3">

@@ -31,8 +31,8 @@ The MVP covers the full loop **sheet → link → cart → order → stock** (§
 | Module | In MVP (Phase 1) | Deferred (Phase 2+) |
 |---|---|---|
 | Super Admin | Add/edit/activate/deactivate/delete client, auto default link, plans (manual assign, limits, trial, expiry), impersonate, send credentials, dashboard counts, sync error log, plan-expiry reminder, sheet template | Razorpay subscription, usage reports, domain/branding settings |
-| Sheet sync | Template, OAuth + service-account connect, auto + manual sync, validation, per-row error log | Column-mapping UI (the MVP uses a fixed header-alias table), variant-wise stock |
-| Catalog links | Default link, manual links (by category / catalog name / individual products), WhatsApp share, QR, allow-ordering toggle, show/hide price | Customer-specific price, password/OTP-protected link, expiry, analytics |
+| Sheet sync | Template, OAuth + service-account connect, auto + manual sync, validation, per-row error log | Column-mapping UI (the MVP uses a fixed header-alias table), variant-wise stock, photos matched from Drive category folders by product name (see PROGRESS.md "Future plan") |
+| Catalog links | Default link, manual links (by category / catalog name / individual products), WhatsApp share, QR, allow-ordering toggle, show/hide price, link-only discounts (all / selected / per product) | Customer-specific price, password/OTP-protected link, expiry, analytics |
 | Customer link | Branded header, grid, filters, catalog view, product detail + gallery/zoom + video, variant select, MOQ/qty limit, share product, lazy thumbnails | Wishlist, Hindi/Gujarati, re-order |
 | Orders | Cart with GST, OTP checkout, payment-mode display, confirmation + wa.me, "My orders", client order list/detail, statuses, reject with reason, mark paid, PDF slip, Excel export, Orders tab in the sheet | Partial confirm, LR/AWB tracking, online payment |
 | Stock | Qty from sheet, out-of-stock badge or hide, cart limit, re-check at checkout | Auto-deduct on confirm, low-stock alert |

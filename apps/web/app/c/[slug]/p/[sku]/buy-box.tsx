@@ -1,5 +1,6 @@
 "use client";
 
+import { Check, Minus, Plus } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { addToCart } from "../../_components/cart-store";
@@ -25,22 +26,31 @@ function Chips({
   options,
   value,
   onChange,
+  error,
 }: {
   label: string;
   options: string[];
   value: string;
   onChange: (v: string) => void;
+  error: boolean;
 }) {
   return (
-    <fieldset>
+    <fieldset id={`choose-${label.toLowerCase()}`} className="scroll-mt-24">
       <legend className="mb-2 text-sm font-medium">
-        {label}: <span className="font-normal text-stone-600">{value || "choose one"}</span>
+        {label}:{" "}
+        {value ? (
+          <span className="font-normal text-stone-600">{value}</span>
+        ) : (
+          <span className={error ? "font-semibold text-red-600" : "font-normal text-stone-500"}>
+            {error ? `Please choose a ${label.toLowerCase()}` : "choose one"}
+          </span>
+        )}
       </legend>
       <div className="flex flex-wrap gap-2">
         {options.map((o) => (
           <label
             key={o}
-            className={`cursor-pointer rounded-full border px-3.5 py-1.5 text-sm ${value === o ? "border-brand-500 bg-brand-50 font-medium text-brand-700" : "border-stone-300 bg-white"}`}
+            className={`cursor-pointer rounded-full border px-4 py-2 text-sm ${value === o ? "border-brand-500 bg-brand-50 font-medium text-brand-700" : error && !value ? "border-red-300 bg-white" : "border-stone-300 bg-white"}`}
           >
             <input
               type="radio"
@@ -59,7 +69,12 @@ function Chips({
 }
 
 /** Where "Add to cart" puts the line; null when the link doesn't allow ordering. */
-export type CartTarget = { linkId: string; slug: string; productId: string; imageUrl: string | null } | null;
+export type CartTarget = {
+  linkId: string;
+  slug: string;
+  productId: string;
+  imageUrl: string | null;
+} | null;
 
 /**
  * Colour / size / full set choice and a quantity stepper (minimum = MOQ, maximum = stock), then
@@ -77,6 +92,7 @@ export function BuyBox({
   cart: CartTarget;
 }) {
   const [added, setAdded] = useState(false);
+  const [showMissing, setShowMissing] = useState(false);
   const isSet = p.priceType === "SET";
   const colourOptions = isSet && p.colours.length > 1 ? [FULL_SET, ...p.colours] : p.colours;
   const sizeOptions = !isSet && p.sizes.length > 1 ? p.sizes : [];
@@ -121,10 +137,28 @@ export function BuyBox({
   return (
     <div className="space-y-5">
       {colourOptions.length > 1 && (
-        <Chips label="Colour" options={colourOptions} value={colour} onChange={setColour} />
+        <Chips
+          label="Colour"
+          options={colourOptions}
+          value={colour}
+          onChange={(v) => {
+            setColour(v);
+            setAdded(false);
+          }}
+          error={showMissing}
+        />
       )}
       {sizeOptions.length > 0 && (
-        <Chips label="Size" options={sizeOptions} value={size} onChange={setSize} />
+        <Chips
+          label="Size"
+          options={sizeOptions}
+          value={size}
+          onChange={(v) => {
+            setSize(v);
+            setAdded(false);
+          }}
+          error={showMissing}
+        />
       )}
       {isSet && p.sizes.length > 0 && (
         <p className="text-sm text-stone-600">
@@ -143,9 +177,9 @@ export function BuyBox({
                 aria-label="Decrease quantity"
                 onClick={() => setClamped(qty - 1)}
                 disabled={qty <= min}
-                className="size-11 rounded-l-full text-lg disabled:text-stone-300"
+                className="flex size-11 items-center justify-center rounded-l-full disabled:text-stone-300"
               >
-                −
+                <Minus aria-hidden="true" className="size-4" />
               </button>
               <input
                 aria-label="Quantity"
@@ -160,23 +194,17 @@ export function BuyBox({
                 aria-label="Increase quantity"
                 onClick={() => setClamped(qty + 1)}
                 disabled={qty >= max}
-                className="size-11 rounded-r-full text-lg disabled:text-stone-300"
+                className="flex size-11 items-center justify-center rounded-r-full disabled:text-stone-300"
               >
-                +
+                <Plus aria-hidden="true" className="size-4" />
               </button>
             </div>
             <p className="text-xs text-stone-500">
               Min {qtyLabel(min, p.priceType)}
               <br />
-              {max} available
+              {max} in stock
             </p>
           </div>
-          {total !== null && (
-            <p className="mt-3 text-sm">
-              Total: <span className="text-base font-semibold">{rupees(total)}</span>
-              {p.gstPct ? <span className="text-stone-500"> + {p.gstPct}% GST</span> : null}
-            </p>
-          )}
         </div>
       ) : (
         <p className="rounded-xl bg-stone-100 px-4 py-3 text-sm text-stone-700">
@@ -187,54 +215,79 @@ export function BuyBox({
         </p>
       )}
 
-      <div className="space-y-2">
-        {canBuy && missing.length > 0 ? (
-          <button type="button" disabled className="h-12 w-full rounded-full bg-stone-200 text-sm font-semibold text-stone-500">
-            Choose {missing.join(" and ")}
-          </button>
-        ) : canBuy && cart ? (
-          added ? (
-            <Link
-              href={`/c/${cart.slug}/cart`}
-              className="flex h-12 w-full items-center justify-center rounded-full bg-stone-900 text-sm font-semibold text-white"
-            >
-              Added ✓ View cart
-            </Link>
+      {/* The main action: a bar stuck to the bottom of the screen on phones, inline on larger screens. */}
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-stone-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:static md:border-0 md:bg-transparent md:p-0">
+        <div className="mx-auto flex max-w-6xl items-center gap-3">
+          {canBuy && total !== null && (
+            <p className="shrink-0 leading-tight">
+              <span className="block text-xs text-stone-500">Total</span>
+              <span className="text-lg font-semibold">{rupees(total)}</span>
+              {p.gstPct ? (
+                <span className="block text-[11px] text-stone-500">+ {p.gstPct}% GST</span>
+              ) : null}
+            </p>
+          )}
+          {canBuy && cart ? (
+            added ? (
+              <Link
+                href={`/c/${cart.slug}/cart`}
+                className="flex h-12 flex-1 items-center justify-center gap-1.5 rounded-full bg-stone-900 text-sm font-semibold text-white"
+              >
+                <Check aria-hidden="true" className="size-4" /> Added · View cart
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  if (missing.length) {
+                    setShowMissing(true);
+                    document
+                      .getElementById(`choose-${missing[0]}`)
+                      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    return;
+                  }
+                  addToCart(cart.linkId, {
+                    productId: cart.productId,
+                    sku: p.sku,
+                    name: p.name,
+                    imageUrl: cart.imageUrl,
+                    colour: colour || undefined,
+                    size: !isSet && size ? size : undefined,
+                    qty,
+                    price: p.price,
+                  });
+                  setAdded(true);
+                }}
+                className="h-12 flex-1 rounded-full bg-brand-500 text-sm font-semibold text-white hover:bg-brand-600"
+              >
+                Add to cart
+              </button>
+            )
           ) : (
-            <button
-              type="button"
-              onClick={() => {
-                addToCart(cart.linkId, {
-                  productId: cart.productId,
-                  sku: p.sku,
-                  name: p.name,
-                  imageUrl: cart.imageUrl,
-                  colour: colour || undefined,
-                  size: !isSet && size ? size : undefined,
-                  qty,
-                  price: p.price,
-                });
-                setAdded(true);
-              }}
-              className="h-12 w-full rounded-full bg-brand-500 text-sm font-semibold text-white hover:bg-brand-600"
+            <a
+              href={waUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex h-12 flex-1 items-center justify-center rounded-full bg-[#1f8f4e] text-sm font-semibold text-white hover:bg-[#187a42]"
             >
-              Add to cart
-            </button>
-          )
-        ) : null}
-        {!(canBuy && missing.length > 0) && (
+              {canBuy ? "Order on WhatsApp" : "Ask on WhatsApp"}
+            </a>
+          )}
+        </div>
+      </div>
+      {canBuy && cart && (
+        <p className="text-sm text-stone-600">
+          Have a question?{" "}
           <a
             href={waUrl}
             target="_blank"
             rel="noreferrer"
-            className={`flex h-12 w-full items-center justify-center rounded-full text-sm font-semibold ${
-              canBuy && cart ? "bg-white text-[#187a42] ring-1 ring-[#1f8f4e]" : "bg-[#1f8f4e] text-white hover:bg-[#187a42]"
-            }`}
+            className="font-medium text-[#187a42] underline"
           >
-            {canBuy && !cart ? "Order on WhatsApp" : "Ask on WhatsApp"}
+            Ask on WhatsApp
           </a>
-        )}
-      </div>
+        </p>
+      )}
     </div>
   );
 }

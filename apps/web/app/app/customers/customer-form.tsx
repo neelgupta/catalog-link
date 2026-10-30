@@ -25,7 +25,7 @@ export function CustomerForm({
   const err = (name: string) => state.fieldErrors?.[name];
 
   return (
-    <form action={formAction} className="space-y-6 lg:space-y-10">
+    <form action={formAction} className="space-y-5">
       <FormError message={state.error} />
       <FormSuccess message={state.ok ? state.message : undefined} />
 

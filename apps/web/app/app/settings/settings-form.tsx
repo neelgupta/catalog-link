@@ -42,7 +42,7 @@ export function SettingsForm({
       : [...INTERVALS, settings.syncIntervalMin].sort((a, b) => a - b);
 
   return (
-    <form action={formAction} className="space-y-6 lg:space-y-10">
+    <form action={formAction} className="space-y-5">
       <FormError message={state.error} />
       <FormSuccess message={state.ok ? state.message : undefined} />
 

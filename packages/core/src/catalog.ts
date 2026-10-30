@@ -1,6 +1,7 @@
 // Public catalog: resolving a link, loading what customers may see, and filtering it.
 // Results are plain JSON (numbers and ISO strings) so the web app can cache them.
 import { forClient, prisma, type Prisma } from "@cataloglink/db";
+import { type LinkPricing, NO_PRICING, parseLinkPricing, priceOnLink } from "./link-pricing";
 import { linkProductWhere, selectionValuesOf, VISIBLE_PRODUCT } from "./links";
 import { getPlatformSettings } from "./platform";
 import { isNewArrival } from "./products";
@@ -19,6 +20,8 @@ export type CatalogContext = {
     allowOrdering: boolean;
     selectionType: "ALL" | "CATEGORY" | "CATALOG" | "PRODUCTS";
     selectionValues: string[];
+    /** Link-only discounts (custom links). */
+    pricing: LinkPricing;
   };
   client: {
     id: string;
@@ -47,8 +50,13 @@ export type CatalogItem = {
   colours: string[];
   sizes: string[];
   piecesPerSet: number | null;
+  /** The price on this link (after the link's discount, if any). */
   price: number | null;
   mrp: number | null;
+  /** The sheet price when this link lowers it (shown crossed out), else null. */
+  listPrice: number | null;
+  /** e.g. "10% off" when this link lowers the price. */
+  discountLabel: string | null;
   priceType: "PIECE" | "SET";
   moq: number;
   availableQty: number;
@@ -96,6 +104,7 @@ export async function resolveCatalogLink(slug: string, now = new Date()): Promis
       allowOrdering: link.allowOrdering,
       selectionType: link.selectionType,
       selectionValues: selectionValuesOf(link),
+      pricing: link.isDefault ? NO_PRICING : parseLinkPricing(link.pricing),
     },
     client: {
       id: c.id,
@@ -129,11 +138,13 @@ const num = (d: Prisma.Decimal | null) => (d === null ? null : Number(d));
 
 function toItem(
   p: Prisma.ProductGetPayload<{ include: { images: true } }>,
-  showPrice: boolean,
+  link: Pick<CatalogContext["link"], "showPrice" | "pricing">,
   newArrivalDays: number,
   now: Date,
 ): CatalogItem {
   const img = p.images.find((i) => i.status === "READY" && i.thumbUrl);
+  const showPrice = link.showPrice;
+  const onLink = priceOnLink(link.pricing, p.id, Number(p.price));
   return {
     id: p.id,
     sku: p.sku,
@@ -144,8 +155,10 @@ function toItem(
     colours: p.colours,
     sizes: p.sizes,
     piecesPerSet: p.piecesPerSet,
-    price: showPrice ? num(p.price) : null,
+    price: showPrice ? onLink.price : null,
     mrp: showPrice ? num(p.mrp) : null,
+    listPrice: showPrice ? onLink.listPrice : null,
+    discountLabel: showPrice ? onLink.label : null,
     priceType: p.priceType,
     moq: p.moq,
     availableQty: Math.max(0, p.availableQty),
@@ -165,7 +178,7 @@ export async function loadCatalogSnapshot(ctx: CatalogContext, now = new Date())
     include: { images: { where: { status: "READY" }, orderBy: { position: "asc" }, take: 1 } },
   });
   return {
-    items: products.map((p) => toItem(p, ctx.link.showPrice, newArrivalDays, now)),
+    items: products.map((p) => toItem(p, ctx.link, newArrivalDays, now)),
     lowStockThreshold: settings.lowStockThreshold,
   };
 }
@@ -179,7 +192,7 @@ export async function loadCatalogProduct(ctx: CatalogContext, sku: string, now =
   });
   if (!p) return null;
   return {
-    ...toItem(p, ctx.link.showPrice, newArrivalDays, now),
+    ...toItem(p, ctx.link, newArrivalDays, now),
     description: p.description,
     videoUrl: p.videoUrl,
     gstPct: num(p.gstPct),

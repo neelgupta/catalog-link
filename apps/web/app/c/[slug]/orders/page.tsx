@@ -34,9 +34,14 @@ export default async function MyOrdersPage({ params }: { params: Promise<{ slug:
             </span>
           )}
         </div>
-        <DeviceOrders slug={ctx.link.slug} />
+        <DeviceOrders slug={ctx.link.slug} showEmpty={!session} />
         {!session ? (
-          <LoginGate slug={ctx.link.slug} devHint={getEnv().OTP_PROVIDER === "console"} />
+          <details className="group text-center">
+            <summary className="cursor-pointer list-none text-sm text-stone-600 underline group-open:mb-4 group-open:no-underline">
+              Ordered from another phone? Find your orders with your mobile number
+            </summary>
+            <LoginGate slug={ctx.link.slug} devHint={getEnv().OTP_PROVIDER === "console"} />
+          </details>
         ) : orders.length === 0 ? (
           <div className="rounded-xl bg-white px-4 py-10 text-center text-sm text-stone-600 ring-1 ring-stone-200">
             No orders yet.{" "}

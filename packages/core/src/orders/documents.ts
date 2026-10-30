@@ -135,7 +135,11 @@ export async function orderPdf(
       n: String(i + 1),
       item: `${item.name}\n${item.sku}${variant ? ` · ${variant}` : ""}`,
       qty: `${item.qty} ${unit}`,
-      rate: money(item.unitPrice) + (item.gstPct ? `\n+${Number(item.gstPct)}% GST` : ""),
+      // A link discount shows the sheet price it was lowered from.
+      rate:
+        money(item.unitPrice) +
+        (item.listPrice !== null ? `\nwas ${money(item.listPrice)}` : "") +
+        (item.gstPct ? `\n+${Number(item.gstPct)}% GST` : ""),
       amount: money(item.lineTotal),
       check: "",
     };

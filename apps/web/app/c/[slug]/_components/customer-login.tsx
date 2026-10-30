@@ -4,7 +4,7 @@ import { useState } from "react";
 
 export type SavedCustomer = { name: string; shopName: string | null; city: string | null; address: string | null; gst: string | null } | null;
 
-const inputClass = "h-11 w-full rounded-lg border border-stone-300 bg-white px-3 text-base outline-none focus:border-brand-500 sm:text-sm";
+const inputClass = "h-11 w-full rounded-xl border border-stone-300 bg-white px-3.5 text-base outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 sm:text-sm";
 
 async function post(url: string, body: object) {
   const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });

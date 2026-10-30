@@ -31,7 +31,10 @@ export type CartProduct = {
   sku: string;
   name: string;
   priceType: "PIECE" | "SET";
+  /** The price on the link (after any link discount). */
   price: Prisma.Decimal;
+  /** The sheet price when the link lowers it, else null/undefined. */
+  listPrice?: Prisma.Decimal | null;
   gstPct: Prisma.Decimal | null;
   moq: number;
   availableQty: number;
@@ -60,6 +63,8 @@ export type PricedLine = {
   /** What can be ordered now (0 when the line can't be ordered). */
   qty: number;
   unitPrice: number;
+  /** The sheet price when the link lowers it (shown crossed out), else null. */
+  listPrice: number | null;
   gstPct: number | null;
   lineTotal: number;
   gstAmount: number;
@@ -118,7 +123,7 @@ export function priceCart(products: CartProduct[], lines: CartLine[], opts: { co
       priced.push({
         key: line.key, productId: line.productId, sku: "", name: "", imageUrl: null, colour: line.colour, size: line.size,
         priceType: "PIECE", piecesPerSet: null, moq: 1, availableQty: 0, colours: [], sizes: [],
-        requestedQty: line.qty, qty: 0, unitPrice: 0, gstPct: null, lineTotal: 0, gstAmount: 0, issues: ["removed"],
+        requestedQty: line.qty, qty: 0, unitPrice: 0, listPrice: null, gstPct: null, lineTotal: 0, gstAmount: 0, issues: ["removed"],
       });
       continue;
     }
@@ -150,7 +155,7 @@ export function priceCart(products: CartProduct[], lines: CartLine[], opts: { co
     priced.push({
       key: line.key, productId: p.id, sku: p.sku, name: p.name, imageUrl: p.imageUrl, colour: line.colour, size: line.size,
       priceType: p.priceType, piecesPerSet: p.piecesPerSet, moq, availableQty: Math.max(0, p.availableQty), colours: p.colours, sizes: p.sizes,
-      requestedQty: line.qty, qty, unitPrice: unitPrice.toNumber(), gstPct: p.gstPct ? p.gstPct.toNumber() : null,
+      requestedQty: line.qty, qty, unitPrice: unitPrice.toNumber(), listPrice: p.listPrice ? p.listPrice.toNumber() : null, gstPct: p.gstPct ? p.gstPct.toNumber() : null,
       lineTotal: lineTotal.toNumber(), gstAmount: gstAmount.toNumber(), issues,
     });
   }
@@ -171,7 +176,7 @@ export function priceCart(products: CartProduct[], lines: CartLine[], opts: { co
 export function hidePrices<T extends { lines: PricedLine[]; totals: CartTotals }>(cart: T) {
   return {
     ...cart,
-    lines: cart.lines.map((l) => ({ ...l, unitPrice: null, lineTotal: null, gstAmount: null })),
+    lines: cart.lines.map((l) => ({ ...l, unitPrice: null, listPrice: null, lineTotal: null, gstAmount: null })),
     totals: { subtotal: null, gstTotal: null, grandTotal: null, itemCount: cart.totals.itemCount },
   };
 }

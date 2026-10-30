@@ -23,6 +23,8 @@ const item = (o: Partial<CatalogItem>): CatalogItem => ({
   piecesPerSet: null,
   price: 500,
   mrp: null,
+  listPrice: null,
+  discountLabel: null,
   priceType: "PIECE",
   moq: 1,
   availableQty: 10,

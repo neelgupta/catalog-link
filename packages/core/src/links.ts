@@ -1,7 +1,8 @@
 import { forClient, Prisma, prisma, type LinkSelectionType } from "@cataloglink/db";
-import type { LinkCreateInput, LinkUpdateInput } from "@cataloglink/validation";
+import type { LinkCreateInput, LinkPricing, LinkUpdateInput } from "@cataloglink/validation";
 import { slugTaken } from "./clients";
 import { DomainError } from "./errors";
+import { freeProducts, NO_PRICING } from "./link-pricing";
 import { uniqueSlug } from "./slug";
 import { getCurrentSubscription } from "./subscriptions";
 
@@ -50,6 +51,49 @@ export async function linkUsage(clientId: string, db: Tx = prisma) {
 }
 
 /** De-duplicated selection values; product ids are kept only when they belong to the client. */
+/**
+ * Pricing as stored: only for custom links, only for this client's products, and refused when a ₹
+ * discount would make a product on the link free (discounts only lower prices).
+ */
+async function cleanPricing(
+  tx: Tx,
+  clientId: string,
+  isDefault: boolean,
+  selection: { selectionType: LinkSelectionType; selectionValues: string[] },
+  pricing: LinkPricing | undefined,
+): Promise<LinkPricing> {
+  if (isDefault || !pricing || pricing.mode === "NONE") return NO_PRICING;
+  const own = async (ids: string[]) => {
+    const found = await tx.product.findMany({ where: { clientId, id: { in: ids } }, select: { id: true } });
+    const known = new Set(found.map((p) => p.id));
+    return ids.filter((id) => known.has(id));
+  };
+  let clean: LinkPricing = pricing;
+  if (pricing.mode === "GROUP") {
+    const productIds = await own([...new Set(pricing.productIds)]);
+    if (!productIds.length) throw new DomainError("PRICING_EMPTY", "Pick at least one product for the discount", "pricing");
+    clean = { ...pricing, productIds };
+  } else if (pricing.mode === "EACH") {
+    const ids = await own(Object.keys(pricing.discounts));
+    if (!ids.length) throw new DomainError("PRICING_EMPTY", "Give at least one product a discount", "pricing");
+    clean = { mode: "EACH", discounts: Object.fromEntries(ids.map((id) => [id, pricing.discounts[id]!])) };
+  }
+  const onLink = await tx.product.findMany({
+    where: { clientId, removedFromSheetAt: null, ...linkProductWhere(selection) },
+    select: { id: true, name: true, price: true },
+  });
+  const free = freeProducts(clean, onLink.map((p) => ({ id: p.id, name: p.name, price: Number(p.price) })));
+  if (free.length) {
+    const names = free.slice(0, 3).map((p) => p.name).join(", ");
+    throw new DomainError(
+      "DISCOUNT_TOO_BIG",
+      `The discount is more than the price of ${free.length === 1 ? names : `${free.length} products (${names}${free.length > 3 ? "…" : ""})`}. Use a smaller discount.`,
+      "pricing",
+    );
+  }
+  return clean;
+}
+
 async function cleanSelection(tx: Tx, clientId: string, type: LinkSelectionType, values: string[]) {
   if (type === "ALL") return [];
   const unique = [...new Map(values.map((v) => [v.toLowerCase(), v])).values()];
@@ -67,7 +111,10 @@ function isUniqueViolation(err: unknown) {
 const SLUG_TAKEN = () => new DomainError("SLUG_TAKEN", "This link address is already taken. Try another one.", "slug");
 
 /** Creates a custom link, within the plan's custom-link limit. An empty slug is generated from the name. */
-export async function createLink(clientId: string, input: LinkCreateInput) {
+/** `pricing` may be left out (no discount). */
+type WithOptionalPricing<T> = Omit<T, "pricing"> & { pricing?: LinkPricing };
+
+export async function createLink(clientId: string, input: WithOptionalPricing<LinkCreateInput>) {
   try {
     return await prisma.$transaction(async (tx) => {
       // Serialise link creation per client so two requests can't both pass the limit check.
@@ -88,6 +135,7 @@ export async function createLink(clientId: string, input: LinkCreateInput) {
       if (!slug) slug = await uniqueSlug(`${client.slug} ${input.name}`, (s) => slugTaken(tx, s));
       else if (await slugTaken(tx, slug)) throw SLUG_TAKEN();
 
+      const selectionValues = await cleanSelection(tx, clientId, input.selectionType, input.selectionValues);
       return tx.catalogLink.create({
         data: {
           clientId,
@@ -95,7 +143,8 @@ export async function createLink(clientId: string, input: LinkCreateInput) {
           name: input.name,
           isDefault: false,
           selectionType: input.selectionType,
-          selectionValues: await cleanSelection(tx, clientId, input.selectionType, input.selectionValues),
+          selectionValues,
+          pricing: await cleanPricing(tx, clientId, false, { selectionType: input.selectionType, selectionValues }, input.pricing),
           showPrice: input.showPrice,
           allowOrdering: input.allowOrdering,
           isActive: input.isActive,
@@ -112,17 +161,19 @@ export async function createLink(clientId: string, input: LinkCreateInput) {
  * Updates a link's name, products and options. The address never changes. The default link always
  * shows all products and stays active (deactivate the client to switch the catalog off).
  */
-export async function updateLink(clientId: string, linkId: string, input: LinkUpdateInput) {
+export async function updateLink(clientId: string, linkId: string, input: WithOptionalPricing<LinkUpdateInput>) {
   return prisma.$transaction(async (tx) => {
     const link = await tx.catalogLink.findFirst({ where: { id: linkId, clientId } });
     if (!link) throw new DomainError("LINK_NOT_FOUND", "Link not found");
     const selectionType = link.isDefault ? "ALL" : input.selectionType;
+    const selectionValues = await cleanSelection(tx, clientId, selectionType, input.selectionValues);
     return tx.catalogLink.update({
       where: { id: link.id },
       data: {
         name: input.name,
         selectionType,
-        selectionValues: await cleanSelection(tx, clientId, selectionType, input.selectionValues),
+        selectionValues,
+        pricing: await cleanPricing(tx, clientId, link.isDefault, { selectionType, selectionValues }, input.pricing),
         showPrice: input.showPrice,
         allowOrdering: input.allowOrdering,
         isActive: link.isDefault ? true : input.isActive,

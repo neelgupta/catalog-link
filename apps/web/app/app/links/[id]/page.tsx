@@ -2,6 +2,7 @@ import { selectionValuesOf } from "@cataloglink/core/links";
 import { forClient } from "@cataloglink/db";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { parseLinkPricing } from "@cataloglink/core/link-pricing";
 import { FormSection, PageHeader } from "@/components/ui";
 import { requireClient } from "@/lib/auth";
 import { updateLinkAction } from "../actions";
@@ -32,12 +33,13 @@ export default async function EditLinkPage({ params }: { params: Promise<{ id: s
           showPrice: link.showPrice,
           allowOrdering: link.allowOrdering,
           isActive: link.isActive,
+          pricing: parseLinkPricing(link.pricing),
         }}
         {...data}
       />
       {!link.isDefault && (
         <FormSection
-          className="mt-10"
+          className="mt-8"
           title="Delete link"
           description="Customers with this link will see “Catalog not available”. Orders already placed through it are kept."
         >

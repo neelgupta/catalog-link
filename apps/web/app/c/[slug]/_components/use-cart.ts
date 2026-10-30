@@ -21,6 +21,8 @@ export type CheckedLine = {
   requestedQty: number;
   qty: number;
   unitPrice: number | null;
+  /** The sheet price when this link lowers it (shown crossed out). */
+  listPrice: number | null;
   gstPct: number | null;
   lineTotal: number | null;
   issues: Issue[];

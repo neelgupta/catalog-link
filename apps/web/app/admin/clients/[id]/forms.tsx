@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { Trash2, TriangleAlert } from "lucide-react";
+import { Modal } from "@/components/modal";
 import { SubmitButton } from "@/components/submit-button";
 import { Button, FormError, FormSuccess, Input, Select, Textarea } from "@/components/ui";
 import type { ActionState } from "@/lib/actions";
@@ -91,16 +93,65 @@ export function PaymentForm({ action, today }: { action: Action; today: string }
   );
 }
 
+/** "Delete client" button; the pop-up asks for the business name before deleting. */
 export function DeleteClientForm({ action, businessName }: { action: Action; businessName: string }) {
   const [state, formAction] = useActionState(action, {});
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const matches = typed.trim() === businessName;
   return (
-    <form action={formAction} className="space-y-3">
-      <p className="text-sm text-stone-600">
-        Permanently deletes this client, their login, links, products, customers and orders. This can&apos;t be undone.
-        Deactivate the client instead if you may need the data later.
-      </p>
-      <Input label={`Type "${businessName}" to confirm`} name="confirmName" autoComplete="off" error={state.fieldErrors?.confirmName} />
-      <SubmitButton variant="danger" pendingText="Deleting…">Delete client</SubmitButton>
-    </form>
+    <>
+      <Button type="button" variant="danger" onClick={() => setOpen(true)}>
+        <Trash2 aria-hidden="true" className="size-4" /> Delete client
+      </Button>
+      <Modal
+        open={open}
+        onClose={() => {
+          setOpen(false);
+          setTyped("");
+        }}
+        title="Delete client?"
+        size="max-w-md"
+      >
+        <form action={formAction} className="space-y-4">
+          <div className="flex gap-3 rounded-xl bg-red-50 p-3 text-sm text-red-800">
+            <TriangleAlert aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
+            <p>
+              This permanently deletes <span className="font-semibold">{businessName}</span> with their login, links, products,
+              customers and orders. It can&apos;t be undone. Deactivate the client instead if you may need the data later.
+            </p>
+          </div>
+          <Input
+            label={
+              <>
+                Type <span className="font-semibold select-all">{businessName}</span> to confirm
+              </>
+            }
+            name="confirmName"
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            autoComplete="off"
+            autoFocus
+            error={state.fieldErrors?.confirmName}
+          />
+          <FormError message={state.fieldErrors ? undefined : state.error} />
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setOpen(false);
+                setTyped("");
+              }}
+            >
+              Cancel
+            </Button>
+            <SubmitButton variant="danger" pendingText="Deleting…" disabled={!matches}>
+              Delete permanently
+            </SubmitButton>
+          </div>
+        </form>
+      </Modal>
+    </>
   );
 }

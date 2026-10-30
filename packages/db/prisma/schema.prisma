@@ -343,6 +343,8 @@ model CatalogLink {
   showPrice       Boolean           @default(true)
   allowOrdering   Boolean           @default(true)
   isActive        Boolean           @default(true)
+  /// Link-only discounts (custom links): { mode: NONE|ALL|GROUP|EACH, ... }; see core/link-pricing.ts
+  pricing         Json              @default("{}")
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -443,6 +445,8 @@ model OrderItem {
   size      String?
   priceType PriceType
   unitPrice Decimal   @db.Decimal(12, 2)
+  /// The sheet price before the link's discount; null when there was no discount.
+  listPrice Decimal?  @db.Decimal(12, 2)
   gstPct    Decimal?  @db.Decimal(5, 2)
   qty       Int
   lineTotal Decimal   @db.Decimal(12, 2)

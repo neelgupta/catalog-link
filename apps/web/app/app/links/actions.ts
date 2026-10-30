@@ -20,6 +20,8 @@ function linkInput(formData: FormData) {
     showPrice: formData.get("showPrice"),
     allowOrdering: formData.get("allowOrdering"),
     isActive: formData.get("isActive"),
+    /** JSON from the Prices step. */
+    pricing: formData.get("pricing") ?? undefined,
   };
 }
 

@@ -63,7 +63,7 @@ export function ProfileForm({
   const err = (name: string) => state.fieldErrors?.[name];
 
   return (
-    <form onSubmit={onSubmit} className="space-y-6 lg:space-y-10">
+    <form onSubmit={onSubmit} className="space-y-5">
       <FormError message={state.error} />
       <FormSuccess message={state.ok ? state.message : undefined} />
 

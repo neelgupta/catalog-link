@@ -9,7 +9,7 @@ import { useCheckedCart } from "../_components/use-cart";
 
 type Buyer = { name: string; mobile: string; gst: string };
 const BUYER_KEY = "cl_buyer";
-const inputClass = "h-11 w-full rounded-lg border bg-white px-3 text-base outline-none focus:border-brand-500 sm:text-sm";
+const inputClass = "h-11 w-full rounded-xl border bg-white px-3.5 text-base outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 sm:text-sm";
 
 /** Name, mobile and GST from the last order on this phone, so repeat orders are quick. */
 function savedBuyer(): Buyer {

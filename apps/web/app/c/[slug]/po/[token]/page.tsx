@@ -1,3 +1,4 @@
+import { CircleCheck } from "lucide-react";
 import { CUSTOMER_STATUS, PAYMENT_MODE_LABEL } from "@cataloglink/core/orders";
 import { parseBankDetails } from "@cataloglink/core/profile";
 import { prisma } from "@cataloglink/db";
@@ -43,8 +44,7 @@ export default async function PoPage({ params, searchParams }: Props) {
           <div role="status" className="rounded-2xl bg-green-50 p-4 text-green-900 ring-1 ring-green-200">
             <p className="text-lg font-semibold">Order placed. Thank you!</p>
             <p className="mt-1 text-sm">
-              {client.businessName} has received your order and will confirm it soon. Your Purchase Order is below. Download it or keep this
-              page&apos;s link to check the status later.
+              {client.businessName} has your order. Your Purchase Order is below. You can find it any time in My orders.
             </p>
           </div>
         )}
@@ -92,7 +92,14 @@ export default async function PoPage({ params, searchParams }: Props) {
                   <p className="text-xs text-stone-500">{[i.sku, i.colour, i.size && `Size ${i.size}`].filter(Boolean).join(" · ")}</p>
                   <p className="text-stone-600">
                     {qtyLabel(i.qty, i.priceType)}
-                    {showPrice && ` × ${rupees(Number(i.unitPrice))} / ${unitLabel(i.priceType)}`}
+                    {showPrice && (
+                      <>
+                        {" × "}
+                        {i.listPrice !== null && <span className="text-stone-400 line-through">{rupees(Number(i.listPrice))}</span>}{" "}
+                        <span className={i.listPrice !== null ? "font-medium text-green-700" : ""}>{rupees(Number(i.unitPrice))}</span> /{" "}
+                        {unitLabel(i.priceType)}
+                      </>
+                    )}
                     {showPrice && i.gstPct ? <span className="text-stone-400"> + {Number(i.gstPct)}% GST</span> : null}
                   </p>
                 </div>
@@ -125,7 +132,7 @@ export default async function PoPage({ params, searchParams }: Props) {
           <section className="space-y-2 rounded-2xl bg-white p-4 ring-1 ring-stone-200">
             <h2 className="text-base font-semibold">Payment: {PAYMENT_MODE_LABEL[order.paymentMode]}</h2>
             {order.paymentReceived ? (
-              <p className="text-sm font-medium text-green-700">Payment received ✓</p>
+              <p className="flex items-center gap-1 text-sm font-medium text-green-700"><CircleCheck aria-hidden="true" className="size-4" /> Payment received</p>
             ) : (
               <PaymentDetails mode={order.paymentMode} payment={{ upiId: client.upiId, upiQrUrl: client.upiQrUrl, bank: parseBankDetails(client.bankDetails) }} />
             )}

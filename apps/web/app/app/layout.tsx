@@ -31,7 +31,7 @@ export default async function ClientLayout({ children }: { children: React.React
         <span>
           Super Admin view: you are logged in as <strong>{client?.businessName}</strong>.
         </span>
-        <button type="submit" className="shrink-0 rounded-lg bg-amber-900 px-3 py-1 text-xs font-medium text-white">
+        <button type="submit" className="shrink-0 rounded-full bg-amber-900 px-3 py-1 text-xs font-semibold text-white">
           Exit
         </button>
       </form>

@@ -1,6 +1,7 @@
 import { parseImageRef } from "@cataloglink/core/google";
 import type { Metadata } from "next";
-import Link from "next/link";
+import { BackLink } from "@/components/ui";
+import { SHOW_CATALOGS } from "@/lib/features";
 import { notFound } from "next/navigation";
 import { getCatalogContext, getCatalogProduct, getCatalogSnapshot } from "@/lib/catalog";
 import { CatalogFooter, CatalogHeader } from "../../_components/catalog-header";
@@ -38,7 +39,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const description = [
     p.price !== null && `${rupees(p.price)} / ${unitLabel(p.priceType)}`,
     p.fabric,
-    `MOQ ${qtyLabel(p.moq, p.priceType)}`,
+    `Min. order ${qtyLabel(p.moq, p.priceType)}`,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -63,49 +64,32 @@ export default async function ProductPage({ params }: Props) {
   const base = `/c/${ctx.link.slug}`;
   const url = `${await publicBaseUrl()}${base}/p/${encodeURIComponent(p.sku)}`;
   const { items, lowStockThreshold } = await getCatalogSnapshot(ctx);
+  // Group by catalog name when catalogs are shown (lib/features.ts), otherwise by category.
+  const group = SHOW_CATALOGS ? p.catalogName : null;
   const related = items
-    .filter(
-      (i) =>
-        i.id !== p.id &&
-        (p.catalogName ? i.catalogName === p.catalogName : i.category === p.category),
-    )
+    .filter((i) => i.id !== p.id && (group ? i.catalogName === group : i.category === p.category))
     .slice(0, 8);
   const out = p.availableQty <= 0;
   const low = !out && lowStockThreshold > 0 && p.availableQty <= lowStockThreshold;
 
   const specs: [string, string | null][] = [
-    ["Product code", p.sku],
-    ["Category", p.category],
-    ["Catalog", p.catalogName],
     ["Fabric", p.fabric],
     ["Colours", p.colours.join(", ") || null],
     ["Sizes", p.sizes.join(", ") || null],
     ["Pieces per set", p.piecesPerSet ? String(p.piecesPerSet) : null],
     ["Minimum order", qtyLabel(p.moq, p.priceType)],
-    ["Available", out ? "Out of stock" : qtyLabel(p.availableQty, p.priceType)],
     ["GST", p.gstPct !== null ? `${p.gstPct}%` : null],
   ];
 
   return (
     <div className="min-h-dvh bg-stone-50">
       <CatalogHeader ctx={ctx} url={`${await publicBaseUrl()}${base}`} compact />
-      <main className="mx-auto max-w-6xl px-4 py-4">
-        <nav className="mb-3 truncate text-sm text-stone-500">
-          <Link href={base} className="hover:text-stone-800">
-            All products
-          </Link>
-          {p.catalogName && (
-            <>
-              {" / "}
-              <Link
-                href={`${base}/catalog/${encodeURIComponent(p.catalogName)}`}
-                className="hover:text-stone-800"
-              >
-                {p.catalogName}
-              </Link>
-            </>
-          )}
-        </nav>
+      <main className="mx-auto max-w-6xl px-4 pt-4 pb-28 md:pb-6">
+        <BackLink
+          href={group ? `${base}/catalog/${encodeURIComponent(group)}` : base}
+          label={group ?? "All products"}
+          className="mb-3"
+        />
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:gap-10">
           <Gallery images={p.images} name={p.name} />
@@ -129,16 +113,29 @@ export default async function ProductPage({ params }: Props) {
                   </span>
                 )}
               </div>
-              <h1 className="text-xl font-semibold sm:text-2xl">{p.name}</h1>
-              <p className="mt-1 text-sm text-stone-500">{p.sku}</p>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h1 className="text-xl font-semibold sm:text-2xl">{p.name}</h1>
+                  <p className="mt-0.5 text-sm text-stone-500">Code {p.sku}</p>
+                </div>
+                <ShareButton title={`${p.name} – ${ctx.client.businessName}`} url={url} />
+              </div>
               {p.price !== null ? (
                 <p className="mt-3">
                   <span className="text-2xl font-semibold">{rupees(p.price)}</span>
                   <span className="text-sm text-stone-500"> / {unitLabel(p.priceType)}</span>
-                  {p.mrp !== null && p.mrp > p.price && (
-                    <span className="ml-2 text-sm text-stone-400 line-through">
-                      MRP {rupees(p.mrp)}
-                    </span>
+                  {p.listPrice !== null ? (
+                    <>
+                      <span className="ml-2 text-sm text-stone-400 line-through">{rupees(p.listPrice)}</span>
+                      <span className="ml-2 rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">
+                        {p.discountLabel}
+                      </span>
+                    </>
+                  ) : (
+                    p.mrp !== null &&
+                    p.mrp > p.price && (
+                      <span className="ml-2 text-sm text-stone-400 line-through">MRP {rupees(p.mrp)}</span>
+                    )
                   )}
                   {p.gstPct ? (
                     <span className="block text-xs text-stone-500">+ {p.gstPct}% GST</span>
@@ -152,7 +149,16 @@ export default async function ProductPage({ params }: Props) {
             <BuyBox
               sellerWhatsapp={ctx.client.whatsapp}
               productUrl={url}
-              cart={ctx.link.allowOrdering ? { linkId: ctx.link.id, slug: ctx.link.slug, productId: p.id, imageUrl: p.images[0]?.thumbUrl ?? null } : null}
+              cart={
+                ctx.link.allowOrdering
+                  ? {
+                      linkId: ctx.link.id,
+                      slug: ctx.link.slug,
+                      productId: p.id,
+                      imageUrl: p.images[0]?.thumbUrl ?? null,
+                    }
+                  : null
+              }
               product={{
                 name: p.name,
                 sku: p.sku,
@@ -167,32 +173,32 @@ export default async function ProductPage({ params }: Props) {
               }}
             />
 
-            <div className="flex flex-wrap gap-2">
-              <ShareButton title={`${p.name} – ${ctx.client.businessName}`} url={url} />
-              {p.videoUrl && <Video url={p.videoUrl} embedUrl={videoEmbed(p.videoUrl)} />}
-            </div>
+            {p.videoUrl && <Video url={p.videoUrl} embedUrl={videoEmbed(p.videoUrl)} />}
 
             {p.description && (
               <p className="text-sm whitespace-pre-line text-stone-700">{p.description}</p>
             )}
 
-            <dl className="divide-y divide-stone-200 rounded-2xl bg-white px-4 text-sm ring-1 ring-stone-200">
-              {specs
-                .filter(([, v]) => v)
-                .map(([k, v]) => (
-                  <div key={k} className="grid grid-cols-5 gap-2 py-2.5">
-                    <dt className="col-span-2 text-stone-500">{k}</dt>
-                    <dd className="col-span-3">{v}</dd>
-                  </div>
-                ))}
-            </dl>
+            <section>
+              <h2 className="mb-2 text-sm font-semibold">Details</h2>
+              <dl className="divide-y divide-stone-200 rounded-2xl bg-white px-4 text-sm ring-1 ring-stone-200">
+                {specs
+                  .filter(([, v]) => v)
+                  .map(([k, v]) => (
+                    <div key={k} className="grid grid-cols-5 gap-2 py-2.5">
+                      <dt className="col-span-2 text-stone-500">{k}</dt>
+                      <dd className="col-span-3">{v}</dd>
+                    </div>
+                  ))}
+              </dl>
+            </section>
           </div>
         </div>
 
         {related.length > 0 && (
           <section className="mt-10">
             <h2 className="mb-3 text-base font-semibold">
-              {p.catalogName ? `More from ${p.catalogName}` : `More ${p.category}`}
+              {group ? `More from ${group}` : `More ${p.category}`}
             </h2>
             <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
               {related.map((item) => (

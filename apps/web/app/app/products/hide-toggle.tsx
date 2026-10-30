@@ -1,5 +1,6 @@
 "use client";
 
+import { Eye, EyeOff } from "lucide-react";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { SubmitButton } from "@/components/submit-button";
@@ -7,13 +8,7 @@ import type { ActionState } from "@/lib/actions";
 import { setHiddenAction } from "./actions";
 
 function EyeIcon({ off }: { off: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
-      <circle cx="12" cy="12" r="2.8" />
-      {off && <path d="M4 20 20 4" />}
-    </svg>
-  );
+  return off ? <EyeOff aria-hidden="true" className="size-4" /> : <Eye aria-hidden="true" className="size-4" />;
 }
 
 function SmallButton({ hidden }: { hidden: boolean }) {
