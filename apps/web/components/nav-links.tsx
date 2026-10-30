@@ -15,7 +15,7 @@ function useIsActive() {
 export function NavLinks({ items }: { items: NavItem[] }) {
   const isActive = useIsActive();
   return (
-    <nav className="overflow-x-auto px-2">
+    <nav className="no-scrollbar overflow-x-auto px-2">
       <ul className="flex gap-1 whitespace-nowrap">
         {items.map((item) => {
           const active = isActive(item);

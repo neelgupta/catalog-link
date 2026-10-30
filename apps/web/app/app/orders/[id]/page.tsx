@@ -32,7 +32,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         action={
           <div className="flex flex-wrap gap-2">
             <a href={pdf("order")} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center rounded-lg border border-stone-300 bg-white px-3 text-sm font-medium hover:bg-stone-50">
-              Order PDF
+              PO slip
             </a>
             <a href={pdf("packing")} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center rounded-lg border border-stone-300 bg-white px-3 text-sm font-medium hover:bg-stone-50">
               Packing slip
@@ -145,9 +145,13 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 </a>
               </p>
               {order.gst && <p className="text-stone-600">GSTIN: {order.gst}</p>}
-              <p className="pt-2 text-xs font-medium tracking-wide text-stone-500 uppercase">Deliver to</p>
-              <p className="whitespace-pre-line text-stone-700">{order.deliveryAddress}</p>
-              {order.city && <p className="text-stone-700">{order.city}</p>}
+              {(order.deliveryAddress || order.city) && (
+                <>
+                  <p className="pt-2 text-xs font-medium tracking-wide text-stone-500 uppercase">Deliver to</p>
+                  {order.deliveryAddress && <p className="whitespace-pre-line text-stone-700">{order.deliveryAddress}</p>}
+                  {order.city && <p className="text-stone-700">{order.city}</p>}
+                </>
+              )}
               <p className="pt-2">
                 <Link href={`/app/customers/${order.customerId}`} className="text-brand-700 hover:underline">
                   View customer ({order.customer._count.orders} order{order.customer._count.orders === 1 ? "" : "s"})

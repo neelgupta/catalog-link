@@ -141,7 +141,7 @@ export function CartView({ slug, linkId }: { slug: string; linkId: string }) {
         <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">Remove the items marked in red to continue.</p>
       ) : (
         <Link href={`/c/${slug}/checkout`} className="flex h-12 w-full items-center justify-center rounded-full bg-brand-500 text-sm font-semibold text-white hover:bg-brand-600">
-          Checkout
+          Place Order
         </Link>
       )}
       <Link href={`/c/${slug}`} className="block text-center text-sm text-stone-600 underline">

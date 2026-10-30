@@ -1,4 +1,4 @@
-import { STATUS_LABEL } from "@cataloglink/core/orders";
+import { OPEN_STATUSES, SIMPLE_ORDER_FLOW, STATUS_LABEL } from "@cataloglink/core/orders";
 import type { OrderStatus } from "@cataloglink/db";
 
 const TONES: Record<OrderStatus, string> = {
@@ -13,7 +13,9 @@ const TONES: Record<OrderStatus, string> = {
 };
 
 export function OrderStatusBadge({ status }: { status: OrderStatus }) {
-  return <span className={`inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${TONES[status]}`}>{STATUS_LABEL[status]}</span>;
+  // In the simple flow every open order is "New", so they share its colour.
+  const tone = SIMPLE_ORDER_FLOW && OPEN_STATUSES.includes(status) ? TONES.PLACED : TONES[status];
+  return <span className={`inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${tone}`}>{STATUS_LABEL[status]}</span>;
 }
 
 export const PAYMENT_LABEL = { PAY_LATER: "Pay later", UPI: "UPI", BANK: "Bank transfer" } as const;

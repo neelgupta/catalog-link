@@ -153,7 +153,7 @@ export default async function ProductsPage({
           </div>
           <button className={buttonClass("primary", "w-full md:w-auto")}>Search</button>
         </div>
-        <nav aria-label="Product status" className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-0.5">
+        <nav aria-label="Product status" className="no-scrollbar -mx-1 mt-3 flex gap-2 overflow-x-auto px-1">
           {chips.map((c) => {
             const active = c.stock === stock && c.show === show;
             return (

@@ -9,6 +9,7 @@ import { formatDateTime } from "@/lib/format";
 import { publicBaseUrl } from "@/lib/public-url";
 import { CatalogHeader } from "../_components/catalog-header";
 import { rupees } from "../_components/price";
+import { DeviceOrders } from "../_components/device-orders";
 import { LoginGate, LogoutButton } from "./login-gate";
 import { StatusBadge } from "./status-badge";
 
@@ -33,6 +34,7 @@ export default async function MyOrdersPage({ params }: { params: Promise<{ slug:
             </span>
           )}
         </div>
+        <DeviceOrders slug={ctx.link.slug} />
         {!session ? (
           <LoginGate slug={ctx.link.slug} devHint={getEnv().OTP_PROVIDER === "console"} />
         ) : orders.length === 0 ? (

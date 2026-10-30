@@ -2,9 +2,9 @@
 import { prisma, type OrderStatus } from "@cataloglink/db";
 import { DomainError } from "../errors";
 import { restoreStock } from "./manage";
+import { OPEN_STATUSES, SIMPLE_ORDER_FLOW } from "./status";
 
-/** Customer-facing status names (docs/IMPLEMENTATION.md §12). */
-export const CUSTOMER_STATUS: Record<OrderStatus, string> = {
+const FULL_CUSTOMER_STATUS: Record<OrderStatus, string> = {
   PLACED: "Order received",
   CONFIRMED: "Order confirmed",
   PARTIALLY_CONFIRMED: "Partly confirmed",
@@ -14,6 +14,16 @@ export const CUSTOMER_STATUS: Record<OrderStatus, string> = {
   REJECTED: "Cancelled by seller",
   CANCELLED: "Cancelled",
 };
+
+/** Customer-facing status names (docs/IMPLEMENTATION.md §12); two states in the simple flow. */
+export const CUSTOMER_STATUS: Record<OrderStatus, string> = SIMPLE_ORDER_FLOW
+  ? ({
+      ...Object.fromEntries(OPEN_STATUSES.map((s) => [s, "Order received"])),
+      DELIVERED: "Completed",
+      REJECTED: "Cancelled by seller",
+      CANCELLED: "Cancelled",
+    } as Record<OrderStatus, string>)
+  : FULL_CUSTOMER_STATUS;
 
 export const PAYMENT_MODE_LABEL = { PAY_LATER: "Pay later / credit", UPI: "UPI", BANK: "Bank transfer" } as const;
 

@@ -393,11 +393,30 @@ Concurrency is limited (e.g. 4 per worker) so Drive quota and memory stay low.
    - redirect to the confirmation page
 5. The confirmation page shows the order summary. The client sees the new order on the dashboard (new-order badge). Email alerts and the "Send order on WhatsApp" button are on hold (§13).
 
+**Current flow: "Place Order" without OTP** (replaces steps 1–2 above for now)
+- The cart button says **Place Order**. The form asks only for **name**, **mobile** (required, not verified) and **GST no.** (optional). Payment defaults to the seller's first payment option, and the address and other fields are optional in the API.
+- The order still goes through the same transaction and arrives as **New** (`PLACED`) for the seller.
+- Because the mobile isn't verified:
+  - an order only fills in a known customer's empty details, never overwrites them;
+  - `POST …/checkout` is limited to 15 orders per IP per hour;
+  - the customer reaches their order through a private signed link, `/c/[slug]/po/[token]` (`signPoToken` / `verifyPoToken`, HS256 with `SESSION_SECRET`, one order, one seller, 1 year), not by mobile.
+- **Purchase Order (PO) slip:**
+  - the customer lands on the PO page after placing (supplier, buyer, items, totals, how to pay) with **Download PO (PDF)** (`GET /api/v1/public/c/[slug]/po/[token]/pdf`; no prices on price-hidden links);
+  - the seller gets the same PO from **PO slip** on the order page.
+- "My orders" lists the POs placed on that phone (`localStorage`). The OTP login there still works for orders from other devices.
+- The seller's orders list shows the catalog link each order came from ("via …") and can be filtered by link, including the Excel export.
+
 **Two buyers and the last set:** two parallel checkouts for the final set wait on the same row lock. The second sees `availableQty = 0` and gets a conflict. This case has a test of its own.
 
 ---
 
 ## 12. Order management
+
+**For now: New → Completed only** (`SIMPLE_ORDER_FLOW = true` in `core/src/orders/status.ts`)
+- Sellers see two states, **New** (every open status) and **Completed** (`DELIVERED`). The order page offers one action, **Mark as completed**, which works from any open status. Reject / cancel aren't offered.
+- Tabs are New · Completed · All; the badge counts every open order. Customers see "Order received" → "Completed".
+- Labels in the list, PDFs, Excel and the sheet's Orders tab follow the same two names.
+- The full machine below stays in the code (and its tests). Setting the flag to `false` brings back the detailed steps.
 
 **Status machine** (`core/orders/status.ts`)
 

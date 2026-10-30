@@ -31,10 +31,17 @@ const istDateTime = (d: Date) =>
 export type OrderDocumentKind = "order" | "packing";
 
 /**
- * A4 PDF for one order. "order": items with prices, totals and how to pay. "packing": items, variants
- * and quantities with tick boxes for packing, no prices.
+ * A4 PDF for one order. "order" is the Purchase Order (PO) slip: buyer, supplier, items with prices,
+ * totals and how to pay (`showPrices: false` leaves prices out, for price-hidden links).
+ * "packing": items, variants and quantities with tick boxes for packing, no prices.
  */
-export async function orderPdf(clientId: string, orderId: string, kind: OrderDocumentKind = "order"): Promise<Buffer | null> {
+export async function orderPdf(
+  clientId: string,
+  orderId: string,
+  kind: OrderDocumentKind = "order",
+  opts: { showPrices?: boolean } = {},
+): Promise<Buffer | null> {
+  const prices = kind === "order" && opts.showPrices !== false;
   const [order, client] = await Promise.all([
     getOrder(clientId, orderId),
     prisma.client.findUniqueOrThrow({
@@ -45,7 +52,7 @@ export async function orderPdf(clientId: string, orderId: string, kind: OrderDoc
   if (!order) return null;
 
   const fonts = fontDir();
-  const doc = new PDFDocument({ size: "A4", margin: 40, info: { Title: `Order #${order.orderNo}`, Author: client.businessName } });
+  const doc = new PDFDocument({ size: "A4", margin: 40, info: { Title: kind === "packing" ? `Packing slip ${order.orderNo}` : `Purchase Order ${order.orderNo}`, Author: client.businessName } });
   doc.registerFont("regular", resolve(fonts, "DejaVuSans.ttf"));
   doc.registerFont("bold", resolve(fonts, "DejaVuSans-Bold.ttf"));
   const chunks: Buffer[] = [];
@@ -63,9 +70,9 @@ export async function orderPdf(clientId: string, orderId: string, kind: OrderDoc
   doc.text(`${client.city} · ${client.whatsappNumber ?? client.mobile}`, { width: width * 0.6 });
   if (client.gst) doc.text(`GSTIN: ${client.gst}`, { width: width * 0.6 });
   const headerBottom = doc.y;
-  doc.font("bold").fontSize(13).fillColor("#1c1917").text(kind === "packing" ? "PACKING SLIP" : "ORDER", left, 40, { width, align: "right" });
+  doc.font("bold").fontSize(13).fillColor("#1c1917").text(kind === "packing" ? "PACKING SLIP" : "PURCHASE ORDER", left, 40, { width, align: "right" });
   doc.font("regular").fontSize(9).fillColor(grey);
-  doc.text(`Order #${order.orderNo}`, { width, align: "right" });
+  doc.text(kind === "packing" ? `Order #${order.orderNo}` : `PO No. ${order.orderNo}`, { width, align: "right" });
   doc.text(istDateTime(order.createdAt), { width, align: "right" });
   doc.text(`Status: ${STATUS_LABEL[order.status]}`, { width, align: "right" });
   doc.y = Math.max(doc.y, headerBottom) + 14;
@@ -74,11 +81,11 @@ export async function orderPdf(clientId: string, orderId: string, kind: OrderDoc
 
   // Customer + delivery.
   const blockTop = doc.y;
-  doc.font("bold").fontSize(9).fillColor(grey).text(kind === "packing" ? "SHIP TO" : "CUSTOMER", left, blockTop);
+  doc.font("bold").fontSize(9).fillColor(grey).text(kind === "packing" ? "SHIP TO" : "BUYER", left, blockTop);
   doc.font("bold").fontSize(10).fillColor("#1c1917").text(`${order.customerName}${order.shopName ? `, ${order.shopName}` : ""}`, { width: width / 2 - 10 });
   doc.font("regular").fontSize(9).fillColor("#1c1917");
-  doc.text(order.deliveryAddress, { width: width / 2 - 10 });
-  doc.text(`${order.city ?? ""} · ${order.mobile}`, { width: width / 2 - 10 });
+  if (order.deliveryAddress) doc.text(order.deliveryAddress, { width: width / 2 - 10 });
+  doc.text([order.city, order.mobile].filter(Boolean).join(" · "), { width: width / 2 - 10 });
   if (order.gst) doc.text(`GSTIN: ${order.gst}`, { width: width / 2 - 10 });
   const leftBottom = doc.y;
   doc.font("bold").fontSize(9).fillColor(grey).text("DETAILS", left + width / 2, blockTop);
@@ -93,12 +100,14 @@ export async function orderPdf(clientId: string, orderId: string, kind: OrderDoc
 
   // Items table.
   const cols =
-    kind === "packing"
+    !prices
       ? [
           { key: "n", label: "#", w: 24, align: "left" as const },
           { key: "item", label: "Item", w: width - 24 - 70 - 60, align: "left" as const },
           { key: "qty", label: "Qty", w: 70, align: "right" as const },
-          { key: "check", label: "Packed", w: 60, align: "right" as const },
+          kind === "packing"
+            ? { key: "check", label: "Packed", w: 60, align: "right" as const }
+            : { key: "blank", label: "", w: 60, align: "right" as const },
         ]
       : [
           { key: "n", label: "#", w: 24, align: "left" as const },
@@ -140,7 +149,9 @@ export async function orderPdf(clientId: string, orderId: string, kind: OrderDoc
     const y = doc.y;
     let x = left;
     for (const c of cols) {
-      if (c.key === "check") doc.rect(x + c.w - 18, y + 2, 12, 12).strokeColor(grey).stroke();
+      if (c.key === "blank") {
+        // no prices on this copy
+      } else if (c.key === "check") doc.rect(x + c.w - 18, y + 2, 12, 12).strokeColor(grey).stroke();
       else doc.fillColor("#1c1917").text(cells[c.key]!, x + 4, y + 2, { width: c.w - 8, align: c.align });
       x += c.w;
     }
@@ -149,7 +160,10 @@ export async function orderPdf(clientId: string, orderId: string, kind: OrderDoc
   });
 
   doc.moveDown(0.6);
-  if (kind === "order") {
+  if (kind === "order" && !prices) {
+    doc.font("regular").fontSize(9).fillColor(grey).text("Prices and the total will be confirmed by the supplier.", left, doc.y, { width, align: "right" });
+  }
+  if (prices) {
     const totals: [string, string, boolean][] = [
       ["Subtotal", money(order.subtotal), false],
       ["GST", money(order.gstTotal), false],

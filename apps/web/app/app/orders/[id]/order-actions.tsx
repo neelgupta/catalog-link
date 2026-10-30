@@ -1,5 +1,6 @@
 "use client";
 
+import { SIMPLE_ORDER_FLOW } from "@cataloglink/core/order-status";
 import type { OrderStatus } from "@cataloglink/db";
 import { useActionState, useState } from "react";
 import { SubmitButton } from "@/components/submit-button";
@@ -67,6 +68,18 @@ function CloseForm({ orderId, to, onCancel }: { orderId: string; to: "REJECTED" 
 /** The next status step, reject / cancel with a reason. */
 export function StatusActions({ orderId, status }: { orderId: string; status: OrderStatus }) {
   const [closing, setClosing] = useState(false);
+  // For now: only New → Completed (core/orders/status.ts SIMPLE_ORDER_FLOW).
+  if (SIMPLE_ORDER_FLOW) {
+    if (status === "DELIVERED" || status === "REJECTED" || status === "CANCELLED") {
+      return <p className="text-sm text-stone-500">No further steps for this order.</p>;
+    }
+    return (
+      <div className="space-y-3">
+        <p className="text-sm text-stone-600">Mark the order completed once it has been sent to the customer.</p>
+        <StepForm orderId={orderId} to="DELIVERED" label="Mark as completed" withNote={false} />
+      </div>
+    );
+  }
   const step = NEXT_STEP[status];
   const closeTo = status === "PLACED" ? "REJECTED" : ["CONFIRMED", "PARTIALLY_CONFIRMED", "PACKED"].includes(status) ? "CANCELLED" : null;
 

@@ -7,6 +7,15 @@
 import type { OrderStatus } from "@cataloglink/db";
 import { DomainError } from "../errors";
 
+/**
+ * For now sellers see only two states: New and Completed. The full flow (Confirmed → Packed →
+ * Dispatched → Delivered, reject / cancel) stays in the code; set this to false to bring it back.
+ */
+export const SIMPLE_ORDER_FLOW = true;
+
+/** Orders that aren't finished yet. In the simple flow they all show as "New". */
+export const OPEN_STATUSES: OrderStatus[] = ["PLACED", "CONFIRMED", "PARTIALLY_CONFIRMED", "PACKED", "DISPATCHED"];
+
 const NEXT: Record<OrderStatus, OrderStatus[]> = {
   PLACED: ["CONFIRMED", "REJECTED", "CANCELLED"],
   CONFIRMED: ["PACKED", "CANCELLED"],
@@ -21,8 +30,7 @@ const NEXT: Record<OrderStatus, OrderStatus[]> = {
 /** Statuses that end an order and give its held stock back. */
 export const CLOSING_STATUSES: OrderStatus[] = ["REJECTED", "CANCELLED"];
 
-/** Seller-facing status names. */
-export const STATUS_LABEL: Record<OrderStatus, string> = {
+const FULL_LABEL: Record<OrderStatus, string> = {
   PLACED: "New",
   CONFIRMED: "Confirmed",
   PARTIALLY_CONFIRMED: "Partly confirmed",
@@ -33,11 +41,24 @@ export const STATUS_LABEL: Record<OrderStatus, string> = {
   CANCELLED: "Cancelled",
 };
 
+const SIMPLE_LABEL: Record<OrderStatus, string> = {
+  ...Object.fromEntries(OPEN_STATUSES.map((s) => [s, "New"])),
+  DELIVERED: "Completed",
+  REJECTED: "Rejected",
+  CANCELLED: "Cancelled",
+} as Record<OrderStatus, string>;
+
+/** Seller-facing status names. */
+export const STATUS_LABEL = SIMPLE_ORDER_FLOW ? SIMPLE_LABEL : FULL_LABEL;
+
+/** The full machine, plus (in the simple flow) "complete" straight from any open status. */
 export function canTransition(from: OrderStatus, to: OrderStatus) {
-  return NEXT[from].includes(to);
+  return NEXT[from].includes(to) || (SIMPLE_ORDER_FLOW && to === "DELIVERED" && OPEN_STATUSES.includes(from));
 }
 
+/** The steps the seller is offered. */
 export function nextStatuses(from: OrderStatus): OrderStatus[] {
+  if (SIMPLE_ORDER_FLOW) return OPEN_STATUSES.includes(from) ? ["DELIVERED"] : [];
   return NEXT[from];
 }
 
@@ -51,8 +72,9 @@ export function assertTransition(from: OrderStatus, to: OrderStatus, reason?: st
   }
 }
 
-/** Orders-list tabs and the statuses each one shows. */
-export const ORDER_TABS = {
+type TabDef = { label: string; statuses: readonly OrderStatus[] };
+
+const FULL_TABS: Record<string, TabDef> = {
   new: { label: "New", statuses: ["PLACED"] },
   confirmed: { label: "Confirmed", statuses: ["CONFIRMED", "PARTIALLY_CONFIRMED"] },
   packed: { label: "Packed", statuses: ["PACKED"] },
@@ -60,5 +82,14 @@ export const ORDER_TABS = {
   delivered: { label: "Delivered", statuses: ["DELIVERED"] },
   cancelled: { label: "Cancelled", statuses: ["REJECTED", "CANCELLED"] },
   all: { label: "All", statuses: [] },
-} as const satisfies Record<string, { label: string; statuses: OrderStatus[] }>;
-export type OrderTab = keyof typeof ORDER_TABS;
+};
+
+const SIMPLE_TABS: Record<string, TabDef> = {
+  new: { label: "New", statuses: OPEN_STATUSES },
+  completed: { label: "Completed", statuses: ["DELIVERED"] },
+  all: { label: "All", statuses: [] },
+};
+
+/** Orders-list tabs and the statuses each one shows ("new" and "all" exist in both flows). */
+export const ORDER_TABS = SIMPLE_ORDER_FLOW ? SIMPLE_TABS : FULL_TABS;
+export type OrderTab = string;

@@ -12,6 +12,8 @@ export type OrderFilters = {
   /** YYYY-MM-DD, IST calendar days, inclusive. */
   from?: string;
   to?: string;
+  /** Only orders placed through this catalog link. */
+  linkId?: string;
 };
 
 const IST_DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -25,6 +27,7 @@ export function orderSearchWhere(f: Omit<OrderFilters, "tab">): Prisma.OrderWher
   if (f.from && IST_DAY.test(f.from)) created.gte = istStart(f.from);
   if (f.to && IST_DAY.test(f.to)) created.lt = new Date(istStart(f.to).getTime() + 86_400_000);
   return {
+    ...(f.linkId && { linkId: f.linkId }),
     ...(Object.keys(created).length && { createdAt: created }),
     ...(q && {
       OR: [
@@ -39,7 +42,7 @@ export function orderSearchWhere(f: Omit<OrderFilters, "tab">): Prisma.OrderWher
 }
 
 export function tabWhere(tab: OrderTab): Prisma.OrderWhereInput {
-  const statuses = ORDER_TABS[tab].statuses as readonly OrderStatus[];
+  const statuses = (ORDER_TABS[tab] ?? ORDER_TABS.all!).statuses;
   return statuses.length ? { status: { in: [...statuses] } } : {};
 }
 
@@ -54,14 +57,14 @@ export async function listOrders(clientId: string, f: OrderFilters, page = 1, pa
       orderBy: { createdAt: "desc" },
       skip: (Math.max(1, page) - 1) * pageSize,
       take: pageSize,
-      include: { _count: { select: { items: true } }, items: { select: { imageUrl: true }, take: 1 } },
+      include: { _count: { select: { items: true } }, items: { select: { imageUrl: true }, take: 1 }, link: { select: { name: true } } },
     }),
     db.order.count({ where }),
     db.order.groupBy({ by: ["status"], where: search, _count: { _all: true } }),
   ]);
   const counts = Object.fromEntries(
     (Object.keys(ORDER_TABS) as OrderTab[]).map((tab) => {
-      const statuses = ORDER_TABS[tab].statuses as readonly OrderStatus[];
+      const statuses = ORDER_TABS[tab]!.statuses;
       const n = byStatus.filter((s) => !statuses.length || statuses.includes(s.status)).reduce((sum, s) => sum + s._count._all, 0);
       return [tab, n];
     }),
@@ -81,9 +84,9 @@ export function getOrder(clientId: string, orderId: string) {
   });
 }
 
-/** Orders waiting for the seller (status PLACED), for the badge. */
+/** Orders in the "New" tab, for the badge (just PLACED in the full flow; every open order in the simple one). */
 export function newOrderCount(clientId: string) {
-  return forClient(clientId).order.count({ where: { status: "PLACED" } });
+  return forClient(clientId).order.count({ where: tabWhere("new") });
 }
 
 /** Gives an order's held stock back to its products (used when an order is rejected or cancelled). */

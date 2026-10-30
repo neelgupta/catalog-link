@@ -1,5 +1,5 @@
 import { getEnv } from "@cataloglink/core/env";
-import { CUSTOMER_STATUS, getCustomerOrder, PAYMENT_MODE_LABEL } from "@cataloglink/core/orders";
+import { CUSTOMER_STATUS, getCustomerOrder, OPEN_STATUSES, PAYMENT_MODE_LABEL, SIMPLE_ORDER_FLOW } from "@cataloglink/core/orders";
 import { parseBankDetails } from "@cataloglink/core/profile";
 import { prisma } from "@cataloglink/db";
 import type { Metadata } from "next";
@@ -18,7 +18,8 @@ import { CancelOrderButton } from "./cancel-button";
 
 export const metadata: Metadata = { title: "Order", robots: { index: false } };
 
-const STEPS = ["PLACED", "CONFIRMED", "PACKED", "DISPATCHED", "DELIVERED"] as const;
+// Two steps for now (simple flow); the full one has five.
+const STEPS = SIMPLE_ORDER_FLOW ? (["PLACED", "DELIVERED"] as const) : (["PLACED", "CONFIRMED", "PACKED", "DISPATCHED", "DELIVERED"] as const);
 const shortDate = (d: Date) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }).format(d);
 
 type Props = { params: Promise<{ slug: string; orderNo: string }>; searchParams: Promise<{ placed?: string }> };
@@ -48,7 +49,13 @@ export default async function OrderPage({ params, searchParams }: Props) {
 
   const showPrice = order.link?.showPrice ?? true;
   const closed = order.status === "CANCELLED" || order.status === "REJECTED";
-  const reached = STEPS.indexOf(order.status as (typeof STEPS)[number]);
+  const reached = SIMPLE_ORDER_FLOW
+    ? order.status === "DELIVERED"
+      ? 1
+      : OPEN_STATUSES.includes(order.status)
+        ? 0
+        : -1
+    : (STEPS as readonly string[]).indexOf(order.status);
   const when = (status: string) => order.history.find((h) => h.toStatus === status)?.createdAt;
 
   return (
@@ -83,7 +90,7 @@ export default async function OrderPage({ params, searchParams }: Props) {
               {order.rejectReason ? ` Reason: ${order.rejectReason}` : ""}
             </p>
           ) : (
-            <ol className="mt-4 grid grid-cols-5 gap-1" aria-label="Order progress">
+            <ol className={`mt-4 grid gap-1 ${STEPS.length === 2 ? "grid-cols-2" : "grid-cols-5"}`} aria-label="Order progress">
               {STEPS.map((s, i) => (
                 <li key={s} className="text-center">
                   <span className={`mx-auto block h-1.5 rounded-full ${i <= reached ? "bg-brand-500" : "bg-stone-200"}`} />

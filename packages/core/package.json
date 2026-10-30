@@ -31,7 +31,8 @@
     "./orders": "./src/orders/index.ts",
     "./orders-sheet": "./src/orders/sheet-queue.ts",
     "./order-documents": "./src/orders/documents.ts",
-    "./customers": "./src/customers.ts"
+    "./customers": "./src/customers.ts",
+    "./order-status": "./src/orders/status.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

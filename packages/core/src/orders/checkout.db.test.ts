@@ -7,7 +7,7 @@ import { createClient, deleteClient } from "../clients";
 import { DomainError } from "../errors";
 import { createLink } from "../links";
 import { createPlan } from "../plans";
-import { CheckoutConflict, placeOrder, validateCart } from "./checkout";
+import { CheckoutConflict, placeOrder as placeOrderWith, validateCart } from "./checkout";
 import { cancelOrderByCustomer, getCustomerOrder, listCustomerOrders } from "./customer";
 
 // Everything created here is unique to this run and removed afterwards.
@@ -30,7 +30,9 @@ const product = (clientId: string, sku: string, data: Partial<Prisma.ProductUnch
   prisma.product.create({ data: { clientId, sku, name: sku, category: "Saree", price: 850, gstPct: 5, availableQty: 20, moq: 2, rowHash: sku, sheetRow: ++row, ...data } });
 
 const details = { name: "Mahesh Shah", shopName: "Shah Sarees", city: "Ahmedabad", deliveryAddress: "12, Relief Road, Ahmedabad 380001", paymentMode: "PAY_LATER" };
-const order = (lines: object[], extra: object = {}) => checkoutSchema.parse({ ...details, ...extra, lines });
+const order = (lines: object[], extra: object = {}) => checkoutSchema.parse({ mobile: "9800000001", ...details, ...extra, lines });
+/** placeOrder with the mobile passed separately, as the tests were written. */
+const placeOrder = (ctx: CatalogContext, mobile: string, input: ReturnType<typeof order>) => placeOrderWith(ctx, { ...input, mobile });
 const qtyOf = async (id: string) => (await prisma.product.findUniqueOrThrow({ where: { id } })).availableQty;
 
 async function domainCode(promise: Promise<unknown>) {
@@ -168,6 +170,24 @@ describe("checkout (Postgres)", () => {
     const hiddenCtx = (await resolveCatalogLink(link.slug))!;
     const o = await placeOrder(hiddenCtx, mobile, order([{ productId: ids.saree, colour: "Red", qty: 2, price: null }]));
     expect(Number(o.subtotal)).toBe(1700);
+  });
+});
+
+describe("place order without OTP (Postgres)", () => {
+  it("needs only name and mobile, defaults payment to the seller's first option, and never overwrites a saved customer", async () => {
+    const c = await makeClient("NoOtp");
+    const ctx = (await resolveCatalogLink(c.slug))!;
+    const p = await product(c.id, "NO-1", { moq: 1 });
+    const minimal = checkoutSchema.parse({ name: "Ravi", mobile: "9844400000", lines: [{ productId: p.id, qty: 1, price: 850 }] });
+    expect(minimal).not.toHaveProperty("deliveryAddress", expect.anything());
+    const first = await placeOrderWith(ctx, minimal);
+    expect(first).toMatchObject({ paymentMode: "PAY_LATER", deliveryAddress: "", city: null, customerName: "Ravi" });
+
+    // Someone orders again with the same (unverified) number and different details.
+    const second = await placeOrderWith(ctx, checkoutSchema.parse({ name: "Not Ravi", mobile: "9844400000", gst: "24AAACR5055K1Z5", lines: [{ productId: p.id, qty: 1, price: 850 }] }));
+    expect(second.customerName).toBe("Not Ravi"); // the order keeps what was typed
+    const customer = await prisma.customer.findUniqueOrThrow({ where: { clientId_mobile: { clientId: c.id, mobile: "9844400000" } } });
+    expect(customer).toMatchObject({ name: "Ravi", gst: "24AAACR5055K1Z5" }); // name kept, empty GST filled
   });
 });
 

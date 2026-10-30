@@ -1,27 +1,36 @@
+import { getEnv } from "@cataloglink/core/env";
 import { DomainError } from "@cataloglink/core/errors";
-import { CheckoutConflict, hidePrices, placeOrder } from "@cataloglink/core/orders";
+import { CheckoutConflict, hidePrices, placeOrder, signPoToken } from "@cataloglink/core/orders";
 import { enqueueOrderSheetWrite } from "@cataloglink/core/orders-sheet";
+import { rateLimit } from "@cataloglink/core/ratelimit";
 import { checkoutSchema } from "@cataloglink/validation";
 import { NextResponse } from "next/server";
-import { apiError, crossSiteBlocked, readJson, validationError } from "@/lib/api";
-import { getCustomerSession } from "@/lib/auth";
-import { revalidateClientCatalog } from "@/lib/catalog-cache";
+import { apiError, crossSiteBlocked, readJson, tooManyRequests, validationError } from "@/lib/api";
 import { getCatalogContext } from "@/lib/catalog";
+import { revalidateClientCatalog } from "@/lib/catalog-cache";
+import { clientIp } from "@/lib/request";
 
-/** Places the order (one transaction, see core/orders/checkout.ts). Needs the customer's OTP session. */
+/** Without OTP verification (for now), limit how many orders one connection can place. */
+const ORDERS_PER_IP = { limit: 15, windowSec: 60 * 60 };
+
+/**
+ * "Place Order": places the order in one transaction (see core/orders/checkout.ts). The customer gives
+ * name and mobile (not verified for now). Returns the order number and a private link to its PO slip.
+ */
 export async function POST(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const blocked = crossSiteBlocked(request);
   if (blocked) return blocked;
   const ctx = await getCatalogContext((await params).slug);
   if (!ctx) return apiError(404, "CATALOG_NOT_AVAILABLE", "This catalog link is not active");
-  const session = await getCustomerSession(ctx.client.id);
-  if (!session) return apiError(401, "LOGIN_REQUIRED", "Please verify your mobile number first.");
   const parsed = checkoutSchema.safeParse(await readJson(request));
   if (!parsed.success) return validationError(parsed.error);
 
+  const limited = await rateLimit(`order:ip:${await clientIp()}`, ORDERS_PER_IP.limit, ORDERS_PER_IP.windowSec);
+  if (!limited.ok) return tooManyRequests(limited.retryAfterSec);
+
   let order;
   try {
-    order = await placeOrder(ctx, session.mobile, parsed.data);
+    order = await placeOrder(ctx, parsed.data);
   } catch (err) {
     if (err instanceof CheckoutConflict) {
       const cart = { lines: err.lines, totals: { subtotal: 0, gstTotal: 0, grandTotal: 0, itemCount: 0 } };
@@ -36,5 +45,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   // After commit: stock changed on the catalog; the Orders tab is written by the worker (if switched on).
   revalidateClientCatalog(ctx.client.id);
   await enqueueOrderSheetWrite(ctx.client.id, order.id).catch((e) => console.error("[orders-sheet] enqueue failed", e));
-  return NextResponse.json({ ok: true, orderNo: order.orderNo }, { status: 201 });
+  const token = await signPoToken(order.id, ctx.client.id, getEnv().SESSION_SECRET);
+  return NextResponse.json({ ok: true, orderNo: order.orderNo, poUrl: `/c/${ctx.link.slug}/po/${token}` }, { status: 201 });
 }

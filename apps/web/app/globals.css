@@ -12,3 +12,11 @@
 body {
   @apply bg-stone-50 text-stone-900 antialiased;
 }
+
+/* Horizontally scrolling chip rows and tabs: swipeable, without a scrollbar. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

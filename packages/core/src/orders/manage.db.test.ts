@@ -19,7 +19,7 @@ let clientId: string;
 let productId: string;
 const qty = async () => (await prisma.product.findUniqueOrThrow({ where: { id: productId } })).availableQty;
 const order = (mobile: string, name = "Mahesh Shah", n = 2) =>
-  placeOrder(ctx, mobile, checkoutSchema.parse({ name, shopName: "Shah Sarees", city: "Ahmedabad", deliveryAddress: "12, Relief Road, Ahmedabad", paymentMode: "PAY_LATER", lines: [{ productId, colour: "Red", qty: n, price: 850 }] }));
+  placeOrder(ctx, checkoutSchema.parse({ name, mobile, shopName: "Shah Sarees", city: "Ahmedabad", deliveryAddress: "12, Relief Road, Ahmedabad", paymentMode: "PAY_LATER", lines: [{ productId, colour: "Red", qty: n, price: 850 }] }));
 
 async function code(promise: Promise<unknown>) {
   try {
@@ -57,7 +57,7 @@ describe("order management (Postgres)", () => {
     expect(await newOrderCount(clientId)).toBe(2);
     const all = await listOrders(clientId, { tab: "new" });
     expect(all.orders.map((o) => o.orderNo)).toEqual([1002, 1001]);
-    expect(all.counts).toMatchObject({ new: 2, confirmed: 0, all: 2 });
+    expect(all.counts).toMatchObject({ new: 2, completed: 0, all: 2 });
     expect((await listOrders(clientId, { tab: "all", q: "kiran" })).orders.map((o) => o.orderNo)).toEqual([1002]);
     expect((await listOrders(clientId, { tab: "all", q: "#1001" })).orders.map((o) => o.orderNo)).toEqual([1001]);
     expect((await listOrders(clientId, { tab: "all", q: "1111" })).orders.map((o) => o.orderNo)).toEqual([1001]);
@@ -91,6 +91,15 @@ describe("order management (Postgres)", () => {
     expect(await code(setPaymentReceived(clientId, b, true))).toBe("ORDER_CLOSED");
   });
 
+  it("simple flow: an open order completes in one step and leaves the New count", async () => {
+    const c = (await order("9855555555", "Quick Buyer")).id;
+    const before = await newOrderCount(clientId);
+    await changeOrderStatus(clientId, c, "DELIVERED");
+    expect(await newOrderCount(clientId)).toBe(before - 1);
+    expect((await listOrders(clientId, { tab: "completed" })).orders.map((o) => o.id)).toContain(c);
+    expect((await getOrder(clientId, c))?.history.map((h) => h.toStatus)).toEqual(["PLACED", "DELIVERED"]);
+  });
+
   it("marks payment received", async () => {
     await setPaymentReceived(clientId, a, true);
     expect((await getOrder(clientId, a))?.paymentReceived).toBe(true);
@@ -121,13 +130,13 @@ describe("order management (Postgres)", () => {
     expect(await writeOrderToSheet(a, fake)).toBe("appended");
     const rows = tabs.get("Orders")!;
     expect(rows[0]).toEqual(ORDER_SHEET_HEADERS);
-    expect(rows[1]).toMatchObject(["1001", expect.stringMatching(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/), "Mahesh Shah", "Shah Sarees", "9811111111", "Ahmedabad", "SR-1", "Banarasi Saree", "Red", "", "2", "850", "1700", "1785", "Pay later", "Yes", "Delivered"]);
+    expect(rows[1]).toMatchObject(["1001", expect.stringMatching(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/), "Mahesh Shah", "Shah Sarees", "9811111111", "Ahmedabad", "SR-1", "Banarasi Saree", "Red", "", "2", "850", "1700", "1785", "Pay later", "Yes", "Completed"]);
     expect((await getOrder(clientId, a))?.sheetWrittenAt).toBeTruthy();
 
     await setPaymentReceived(clientId, a, false);
     expect(await writeOrderToSheet(a, fake)).toBe("updated");
     expect(tabs.get("Orders")).toHaveLength(2);
-    expect(tabs.get("Orders")![1]!.slice(15)).toEqual(["No", "Delivered"]);
+    expect(tabs.get("Orders")![1]!.slice(15)).toEqual(["No", "Completed"]);
 
     await prisma.client.update({ where: { id: clientId }, data: { settings: { writeOrdersTab: false } } });
     expect(await writeOrderToSheet(a, fake)).toBe("skipped");

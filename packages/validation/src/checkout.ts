@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { gstSchema } from "./admin";
+import { mobileSchema } from "./common";
 
 const optionalText = (max: number) =>
   z
@@ -29,15 +30,21 @@ export const cartSchema = z.object({
 
 export const CHECKOUT_PAYMENT_MODES = ["PAY_LATER", "UPI", "BANK"] as const;
 
+/**
+ * "Place Order" details. Only name and mobile are required (the mobile isn't verified for now);
+ * the rest is optional so customers can order in seconds.
+ */
 export const checkoutDetailsSchema = z.object({
   name: z.string().trim().min(2, "Enter your name").max(80, "Name is too long"),
-  shopName: optionalText(120),
-  city: z.string().trim().min(2, "Enter your city").max(80, "City is too long"),
-  deliveryAddress: z.string().trim().min(10, "Enter the full delivery address").max(500, "Address is too long"),
+  mobile: mobileSchema,
   gst: gstSchema,
+  shopName: optionalText(120),
+  city: optionalText(80),
+  deliveryAddress: optionalText(500),
   transportPref: optionalText(120),
   notes: optionalText(1000),
-  paymentMode: z.enum(CHECKOUT_PAYMENT_MODES, { error: "Choose how you will pay" }),
+  /** Defaults to the seller's first payment option. */
+  paymentMode: z.enum(CHECKOUT_PAYMENT_MODES).optional(),
 });
 export type CheckoutDetailsInput = z.infer<typeof checkoutDetailsSchema>;
 

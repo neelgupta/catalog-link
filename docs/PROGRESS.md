@@ -151,6 +151,13 @@ For setup see [README.md](../README.md); for how things work see [IMPLEMENTATION
 - **Google Sheet "Orders" tab:** when switched on in Settings, each order is written as rows and its status / payment kept up to date. Problems show on the order and are retried.
 - **Customers:** the list (from orders, or added by hand) with orders and totals; assign catalog links; order history; block / unblock.
 
+### Place Order flow update
+- **"Place Order" instead of Checkout:** customers enter only their name, mobile and GST no. (optional). There's no OTP for now, and the order goes straight to the seller as New.
+- **Purchase Order (PO) slip after every order:** the customer sees it at once and can download it as a PDF (through a private link for that order); the seller downloads the same PO from the order page.
+- **Seller's orders list:** shows the customer's name and the catalog link the order came from, with a filter by link.
+- **Order status simplified for now:** **New → Completed**, with one "Mark as completed" button. The detailed steps (Confirmed, Packed, Dispatched, Delivered, reject/cancel) are switched off, not removed: one setting brings them back.
+- **Safety while OTP is off:** at most 15 orders per hour from one connection, and orders never overwrite a saved customer's details.
+
 ---
 
 ## Versions

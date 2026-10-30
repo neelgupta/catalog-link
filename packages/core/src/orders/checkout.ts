@@ -53,10 +53,10 @@ function isRetryable(err: unknown) {
  * the plan's monthly order limit, locks the products, re-checks stock / MOQ / price, holds the stock,
  * and writes the customer, order, items and history. Throws CheckoutConflict with the changed lines.
  */
-export async function placeOrder(ctx: CatalogContext, mobile: string, input: CheckoutInput, now = new Date()) {
+export async function placeOrder(ctx: CatalogContext, input: CheckoutInput, now = new Date()) {
   for (let attempt = 1; ; attempt++) {
     try {
-      return await placeOrderOnce(ctx, mobile, input, now);
+      return await placeOrderOnce(ctx, input, now);
     } catch (err) {
       if (attempt < 3 && isRetryable(err)) continue;
       throw err;
@@ -64,14 +64,16 @@ export async function placeOrder(ctx: CatalogContext, mobile: string, input: Che
   }
 }
 
-async function placeOrderOnce(ctx: CatalogContext, mobile: string, input: CheckoutInput, now: Date) {
+async function placeOrderOnce(ctx: CatalogContext, input: CheckoutInput, now: Date) {
   const clientId = ctx.client.id;
+  const mobile = input.mobile;
   return prisma.$transaction(
     async (tx) => {
       if (!ctx.link.allowOrdering) throw new DomainError("ORDERING_OFF", ORDERING_UNAVAILABLE);
 
       const client = await tx.client.findUniqueOrThrow({ where: { id: clientId }, select: { paymentModes: true } });
-      if (!client.paymentModes.includes(input.paymentMode)) {
+      const paymentMode = input.paymentMode ?? client.paymentModes[0] ?? "PAY_LATER";
+      if (input.paymentMode && !client.paymentModes.includes(input.paymentMode)) {
         throw new DomainError("PAYMENT_MODE", "Choose one of the payment options shown", "paymentMode");
       }
 
@@ -103,18 +105,20 @@ async function placeOrderOnce(ctx: CatalogContext, mobile: string, input: Checko
       for (const l of cart.lines) perProduct.set(l.productId, (perProduct.get(l.productId) ?? 0) + l.qty);
       for (const [id, qty] of perProduct) await tx.product.update({ where: { id }, data: { availableQty: { decrement: qty } } });
 
+      // The mobile isn't verified (no OTP for now), so an order only fills in a known customer's
+      // missing details and never overwrites what's saved. The order keeps its own copy.
       const details = {
-        name: input.name,
         shopName: input.shopName ?? null,
-        city: input.city,
-        address: input.deliveryAddress,
+        city: input.city ?? null,
+        address: input.deliveryAddress ?? null,
         gst: input.gst ?? null,
       };
-      const customer = await tx.customer.upsert({
-        where: { clientId_mobile: { clientId, mobile } },
-        update: details,
-        create: { clientId, mobile, source: "ORDER", ...details },
-      });
+      const customer = existing
+        ? await tx.customer.update({
+            where: { id: existing.id },
+            data: Object.fromEntries(Object.entries(details).filter(([k, v]) => v && !existing[k as keyof typeof details])),
+          })
+        : await tx.customer.create({ data: { clientId, mobile, source: "ORDER", name: input.name, ...details } });
 
       const orderNo = counter[0].nextOrderNo;
       await tx.clientCounter.update({ where: { clientId }, data: { nextOrderNo: { increment: 1 } } });
@@ -126,15 +130,15 @@ async function placeOrderOnce(ctx: CatalogContext, mobile: string, input: Checko
           linkId: ctx.link.id,
           customerId: customer.id,
           status: "PLACED",
-          paymentMode: input.paymentMode,
+          paymentMode,
           subtotal: cart.totals.subtotal,
           gstTotal: cart.totals.gstTotal,
           grandTotal: cart.totals.grandTotal,
           customerName: input.name,
           shopName: input.shopName ?? null,
           mobile,
-          city: input.city,
-          deliveryAddress: input.deliveryAddress,
+          city: input.city ?? null,
+          deliveryAddress: input.deliveryAddress ?? "",
           gst: input.gst ?? null,
           transportPref: input.transportPref ?? null,
           notes: input.notes ?? null,

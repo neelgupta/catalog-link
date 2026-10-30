@@ -12,6 +12,7 @@ export async function GET(request: Request) {
     q: sp.get("q") ?? undefined,
     from: sp.get("from") ?? undefined,
     to: sp.get("to") ?? undefined,
+    linkId: sp.get("link") ?? undefined,
   });
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
   return new Response(new Uint8Array(xlsx), {
