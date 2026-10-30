@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { OTP_LOGIN_ENABLED } from "./features";
 
 const base64Key32 = z
   .string()
@@ -19,11 +20,20 @@ const envSchema = z
     GOOGLE_SERVICE_ACCOUNT_KEY_FILE: z.string().optional(),
     /** Development only: local fixtures for DEMO_ sheets (ignored in production). */
     GOOGLE_FAKE_DIR: z.string().optional(),
-    OTP_PROVIDER: z.enum(["console", "msg91"]).default("console"),
+    /** Always "off" while OTP_LOGIN_ENABLED is false, whatever .env says. */
+    OTP_PROVIDER: z.preprocess(
+      (v) => (OTP_LOGIN_ENABLED ? v || undefined : "off"),
+      z.enum(["off", "console", "msg91"]).default("console"),
+    ),
     MSG91_AUTH_KEY: z.string().optional(),
     MSG91_OTP_TEMPLATE_ID: z.string().optional(),
   })
   .superRefine((env, ctx) => {
+    // OTP login is switched off (features.ts): its settings aren't needed or checked.
+    if (!OTP_LOGIN_ENABLED) return;
+    if (env.OTP_PROVIDER === "off") {
+      ctx.addIssue({ code: "custom", path: ["OTP_PROVIDER"], message: "set to console or msg91 while OTP login is on" });
+    }
     if (env.OTP_PROVIDER === "msg91") {
       for (const key of ["MSG91_AUTH_KEY", "MSG91_OTP_TEMPLATE_ID"] as const) {
         if (!env[key]) ctx.addIssue({ code: "custom", path: [key], message: "required when OTP_PROVIDER=msg91" });

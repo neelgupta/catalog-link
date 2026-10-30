@@ -1,13 +1,15 @@
+import { OTP_LOGIN_ENABLED } from "@cataloglink/core/features";
 import { getOtpService } from "@cataloglink/core/otp";
 import { LIMITS, rateLimit } from "@cataloglink/core/ratelimit";
 import { prisma } from "@cataloglink/db";
 import { otpSendSchema } from "@cataloglink/validation";
 import { NextResponse } from "next/server";
-import { apiError, readJson, tooManyRequests, validationError } from "@/lib/api";
+import { apiError, otpOff, readJson, tooManyRequests, validationError } from "@/lib/api";
 import { clientIp } from "@/lib/request";
 
 /** Client login: send an OTP to a registered client owner's mobile. */
 export async function POST(request: Request) {
+  if (!OTP_LOGIN_ENABLED) return otpOff();
   const parsed = otpSendSchema.safeParse(await readJson(request));
   if (!parsed.success) return validationError(parsed.error);
   const { mobile } = parsed.data;

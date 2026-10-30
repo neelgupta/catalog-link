@@ -1,5 +1,6 @@
 "use client";
 
+import { OTP_LOGIN_ENABLED } from "@cataloglink/core/features";
 import { useActionState } from "react";
 import { SubmitButton } from "@/components/submit-button";
 import { FormActions, FormError, FormSection, FormSuccess, Input, Textarea } from "@/components/ui";
@@ -42,7 +43,13 @@ export function CustomerForm({
             error={err("mobile")}
             required
             readOnly={mobileLocked}
-            hint={mobileLocked ? "Can't change: the customer finds their orders with this number." : "They log in with an OTP to this number."}
+            hint={
+              mobileLocked
+                ? "Can't change: the customer's orders are kept under this number."
+                : OTP_LOGIN_ENABLED
+                  ? "They log in with an OTP to this number."
+                  : undefined
+            }
           />
           <Input label="City (optional)" name="city" defaultValue={v("city")} error={err("city")} />
           <Input label="GST number (optional)" name="gst" defaultValue={v("gst")} error={err("gst")} className="uppercase" />

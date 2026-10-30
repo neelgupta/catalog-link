@@ -2,6 +2,7 @@ import { getEnv } from "@cataloglink/core/env";
 import { CUSTOMER_STATUS, listCustomerOrders } from "@cataloglink/core/orders";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { OTP_LOGIN_ENABLED } from "@cataloglink/core/features";
 import { notFound } from "next/navigation";
 import { getCustomerSession } from "@/lib/auth";
 import { getCatalogContext } from "@/lib/catalog";
@@ -35,7 +36,7 @@ export default async function MyOrdersPage({ params }: { params: Promise<{ slug:
           )}
         </div>
         <DeviceOrders slug={ctx.link.slug} showEmpty={!session} />
-        {!session ? (
+        {!session && !OTP_LOGIN_ENABLED ? null : !session ? (
           <details className="group text-center">
             <summary className="cursor-pointer list-none text-sm text-stone-600 underline group-open:mb-4 group-open:no-underline">
               Ordered from another phone? Find your orders with your mobile number

@@ -195,6 +195,8 @@ Clients can connect a sheet in two ways, and both need setup in the same Google 
 
 ## MSG91 setup (SMS OTP)
 
+**Mobile OTP login is switched off for now** (`OTP_LOGIN_ENABLED` in `packages/core/src/features.ts`): clients log in with email and password, customers see the orders placed on their phone, and the `OTP_PROVIDER` / `MSG91_*` settings are ignored, so the server starts without them. To turn it back on, set `OTP_LOGIN_ENABLED = true` and follow the steps below.
+
 For development, keep `OTP_PROVIDER=console`.
 
 For real SMS:
@@ -262,4 +264,5 @@ Prisma 7 changed several defaults compared with Prisma 5/6:
 ## Further reading
 
 - [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md): architecture, data model, sync, checkout, order flow, milestone checklist
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md): hosting on an Ubuntu server (PostgreSQL, Redis, PM2, Nginx, HTTPS, backups)
 - The requirements document in the project root: `Textile Wholesale Catalog Link – Requirement & Feature Document.pdf`

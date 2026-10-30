@@ -2,6 +2,7 @@ import { daysLeft, isClientAvailable } from "@cataloglink/core/subscriptions";
 import { prisma } from "@cataloglink/db";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { OTP_LOGIN_ENABLED } from "@cataloglink/core/features";
 import { Avatar } from "@/components/avatar";
 import { SubmitButton } from "@/components/submit-button";
 import { Badge, Card, Detail, EmptyState, FormSuccess, PageHeader } from "@/components/ui";
@@ -137,7 +138,7 @@ export default async function ClientDetailPage({
             <>
               <dl className="mb-4 divide-y divide-stone-100">
                 <Detail label="Email">{owner.email}</Detail>
-                <Detail label="Mobile (OTP)">{owner.mobile}</Detail>
+                <Detail label={OTP_LOGIN_ENABLED ? "Mobile (OTP)" : "Mobile"}>{owner.mobile}</Detail>
                 <Detail label="Last login">{owner.lastLoginAt ? formatDateTime(owner.lastLoginAt) : "Never"}</Detail>
               </dl>
               <ResetPasswordForm action={resetPasswordAction.bind(null, id)} />

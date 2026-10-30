@@ -1,5 +1,6 @@
 "use client";
 
+import { OTP_LOGIN_ENABLED } from "@cataloglink/core/features";
 import { useActionState, useEffect, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { SubmitButton } from "@/components/submit-button";
@@ -92,7 +93,7 @@ export function ClientForm({
             defaultValue={v("mobile")}
             error={err("mobile")}
             required
-            hint="Used for OTP login."
+            hint={OTP_LOGIN_ENABLED ? "Used for OTP login." : undefined}
           />
           <Input
             label="Email"
@@ -161,7 +162,11 @@ export function ClientForm({
         <FormSection
           flat={flat}
           title="Login & plan"
-          description="The client logs in with this email and password, or with an OTP to the mobile."
+          description={
+            OTP_LOGIN_ENABLED
+              ? "The client logs in with this email and password, or with an OTP to the mobile."
+              : "The client logs in with this email and password."
+          }
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">

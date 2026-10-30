@@ -1,3 +1,4 @@
+import { OTP_OFF_MESSAGE } from "@cataloglink/core/features";
 import { NextResponse } from "next/server";
 import type { ZodError } from "zod";
 
@@ -40,4 +41,9 @@ export function crossSiteBlocked(request: Request) {
   const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
   if (origin && host && new URL(origin).host !== host) return apiError(403, "FORBIDDEN", "Cross-site request");
   return null;
+}
+
+/** Answer for the OTP routes while OTP login is switched off (core/features.ts). */
+export function otpOff() {
+  return apiError(404, "OTP_OFF", OTP_OFF_MESSAGE);
 }

@@ -1,8 +1,9 @@
+import { OTP_LOGIN_ENABLED } from "@cataloglink/core/features";
 import { getOtpService } from "@cataloglink/core/otp";
 import { prisma } from "@cataloglink/db";
 import { otpVerifySchema } from "@cataloglink/validation";
 import { NextResponse } from "next/server";
-import { apiError, readJson, validationError } from "@/lib/api";
+import { apiError, otpOff, readJson, validationError } from "@/lib/api";
 import { startStaffSession } from "@/lib/auth";
 
 const MESSAGES = {
@@ -13,6 +14,7 @@ const MESSAGES = {
 
 /** Client login: verify the OTP and start a session. */
 export async function POST(request: Request) {
+  if (!OTP_LOGIN_ENABLED) return otpOff();
   const parsed = otpVerifySchema.safeParse(await readJson(request));
   if (!parsed.success) return validationError(parsed.error);
   const { mobile, code } = parsed.data;

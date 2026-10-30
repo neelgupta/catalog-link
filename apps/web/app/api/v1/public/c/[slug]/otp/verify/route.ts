@@ -1,9 +1,10 @@
+import { OTP_LOGIN_ENABLED } from "@cataloglink/core/features";
 import { getOtpService } from "@cataloglink/core/otp";
 import { findCustomer } from "@cataloglink/core/orders";
 import { rateLimit } from "@cataloglink/core/ratelimit";
 import { otpVerifySchema } from "@cataloglink/validation";
 import { NextResponse } from "next/server";
-import { apiError, crossSiteBlocked, readJson, tooManyRequests, validationError } from "@/lib/api";
+import { apiError, crossSiteBlocked, otpOff, readJson, tooManyRequests, validationError } from "@/lib/api";
 import { startCustomerSession } from "@/lib/auth";
 import { getCatalogContext } from "@/lib/catalog";
 import { clientIp } from "@/lib/request";
@@ -16,6 +17,7 @@ const MESSAGES = {
 
 /** Verifies the customer's OTP, starts their session with this seller and returns saved details. */
 export async function POST(request: Request, { params }: { params: Promise<{ slug: string }> }) {
+  if (!OTP_LOGIN_ENABLED) return otpOff();
   const blocked = crossSiteBlocked(request);
   if (blocked) return blocked;
   const ctx = await getCatalogContext((await params).slug);

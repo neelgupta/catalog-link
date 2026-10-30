@@ -1,3 +1,6 @@
+import { DomainError } from "../errors";
+import { OTP_OFF_MESSAGE } from "../features";
+
 /** Sends an OTP code by SMS. */
 export interface OtpProvider {
   readonly name: string;
@@ -44,10 +47,11 @@ export class Msg91OtpProvider implements OtpProvider {
 }
 
 export function createOtpProvider(env: {
-  OTP_PROVIDER: "console" | "msg91";
+  OTP_PROVIDER: "off" | "console" | "msg91";
   MSG91_AUTH_KEY?: string;
   MSG91_OTP_TEMPLATE_ID?: string;
 }): OtpProvider {
+  if (env.OTP_PROVIDER === "off") throw new DomainError("OTP_OFF", OTP_OFF_MESSAGE);
   if (env.OTP_PROVIDER === "msg91") {
     return new Msg91OtpProvider(env.MSG91_AUTH_KEY!, env.MSG91_OTP_TEMPLATE_ID!);
   }

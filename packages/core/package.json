@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./env": "./src/env.ts",
+    "./features": "./src/features.ts",
     "./password": "./src/auth/password.ts",
     "./session": "./src/auth/session.ts",
     "./otp": "./src/otp/index.ts",

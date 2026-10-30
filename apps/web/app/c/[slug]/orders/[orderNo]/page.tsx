@@ -6,7 +6,8 @@ import { prisma } from "@cataloglink/db";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BackLink } from "@/components/ui";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { OTP_LOGIN_ENABLED } from "@cataloglink/core/features";
 import { getCustomerSession } from "@/lib/auth";
 import { getCatalogContext } from "@/lib/catalog";
 import { formatDateTime } from "@/lib/format";
@@ -33,6 +34,8 @@ export default async function OrderPage({ params, searchParams }: Props) {
   const base = `/c/${ctx.link.slug}`;
   const header = <CatalogHeader ctx={ctx} url={`${await publicBaseUrl()}${base}`} compact />;
   const session = await getCustomerSession(ctx.client.id);
+  // Without OTP login there's no customer login: My orders lists this phone's orders (PO links).
+  if (!session && !OTP_LOGIN_ENABLED) redirect(`${base}/orders`);
   if (!session) {
     return (
       <div className="min-h-dvh bg-stone-50">

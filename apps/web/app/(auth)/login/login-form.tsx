@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
+import { OTP_LOGIN_ENABLED } from "@cataloglink/core/features";
 import { Button, FormError, Input } from "@/components/ui";
 import { passwordLogin, type LoginState } from "./actions";
 
@@ -9,6 +10,15 @@ type Tab = "password" | "otp";
 
 export function LoginForm({ next }: { next?: string }) {
   const [tab, setTab] = useState<Tab>("password");
+
+  // Mobile OTP login is switched off for now (core/features.ts): email and password only.
+  if (!OTP_LOGIN_ENABLED) {
+    return (
+      <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+        <PasswordForm next={next} />
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">

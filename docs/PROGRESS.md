@@ -17,6 +17,7 @@ For setup see [README.md](../README.md); for how things work see [IMPLEMENTATION
 | 8 | Hardening & release prep | Next |
 
 **On hold by request:** notifications (email alerts, WhatsApp message templates, SMTP, the "send login details" button). OTP SMS for login is built.
+**Switched off by request:** mobile OTP login (client "Mobile OTP" login and the customers' "Ordered from another phone?" lookup). `OTP_LOGIN_ENABLED = false` in `packages/core/src/features.ts`; MSG91 settings aren't needed while it's off. Mobile numbers are still collected (orders and customers are matched by them).
 **Removed by request:** OneDrive images. Photos come from Google Drive only.
 
 ## Future plan (paused)

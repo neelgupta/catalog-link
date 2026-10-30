@@ -1,5 +1,7 @@
 import { prisma } from "@cataloglink/db";
 import { getEnv } from "../env";
+import { DomainError } from "../errors";
+import { OTP_LOGIN_ENABLED, OTP_OFF_MESSAGE } from "../features";
 import { createOtpProvider } from "./providers";
 import { OtpService, type OtpStore } from "./service";
 
@@ -34,7 +36,9 @@ export const prismaOtpStore: OtpStore = {
 
 let service: OtpService | undefined;
 
+/** Throws OTP_OFF while OTP login is switched off (features.ts). */
 export function getOtpService(): OtpService {
+  if (!OTP_LOGIN_ENABLED) throw new DomainError("OTP_OFF", OTP_OFF_MESSAGE);
   if (!service) {
     const env = getEnv();
     service = new OtpService(prismaOtpStore, createOtpProvider(env), env.SESSION_SECRET);
