@@ -9,7 +9,8 @@ import { consumeOAuthState } from "@/lib/google-oauth";
 export async function GET(request: NextRequest) {
   const { clientId, impersonatedBy } = await requireClient();
   const params = request.nextUrl.searchParams;
-  const back = (query: string) => NextResponse.redirect(new URL(`/app/sheet?${query}`, request.url));
+  const appUrl = (process.env.APP_URL ?? request.nextUrl.origin).replace(/\/+$/, "");
+  const back = (query: string) => NextResponse.redirect(new URL(`/app/sheet?${query}`, appUrl));
 
   if (!(await consumeOAuthState(params.get("state"), clientId))) return back("error=oauth_state");
   if (params.get("error")) return back("error=oauth_cancelled");
