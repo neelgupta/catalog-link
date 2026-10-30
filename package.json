@@ -1,0 +1,28 @@
+{
+  "name": "cataloglink",
+  "private": true,
+  "packageManager": "pnpm@12.16.1",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "build": "pnpm -r build",
+    "start": "pnpm --parallel --filter \"./apps/*\" start",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:db": "pnpm -r test:db",
+    "format": "prettier --write .",
+    "db:generate": "pnpm --filter @cataloglink/db db:generate",
+    "db:migrate": "pnpm --filter @cataloglink/db db:migrate",
+    "db:deploy": "pnpm --filter @cataloglink/db db:deploy",
+    "db:seed": "pnpm --filter @cataloglink/db db:seed",
+    "db:studio": "pnpm --filter @cataloglink/db db:studio",
+    "demo:data": "pnpm --filter @cataloglink/core demo:data"
+  },
+  "devDependencies": {
+    "prettier": "3.9.10",
+    "typescript": "5.9.3"
+  }
+}

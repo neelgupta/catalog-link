@@ -1,0 +1,23 @@
+{
+  "name": "@cataloglink/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cataloglink/core": "workspace:*",
+    "@cataloglink/db": "workspace:*",
+    "bullmq": "6.5.1",
+    "dotenv": "18.0.9",
+    "pino": "10.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}

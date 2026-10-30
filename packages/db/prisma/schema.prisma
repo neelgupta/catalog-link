@@ -1,0 +1,483 @@
+// CatalogLink — MVP data model. See docs/IMPLEMENTATION.md §5.
+// Tables with a `clientId` column are tenant-owned; access them through db.forClient(clientId).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────────── Enums ─────────────────────────────
+
+enum UserRole {
+  SUPER_ADMIN
+  CLIENT_OWNER
+}
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum PaymentMode {
+  PAY_LATER
+  UPI
+  BANK
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum SheetConnectionMode {
+  OAUTH
+  SERVICE_ACCOUNT
+}
+
+enum SyncTrigger {
+  AUTO
+  MANUAL
+}
+
+enum SyncStatus {
+  QUEUED
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
+enum PriceType {
+  PIECE
+  SET
+}
+
+enum ImageStatus {
+  PENDING
+  READY
+  FAILED
+}
+
+enum LinkSelectionType {
+  ALL
+  CATEGORY
+  CATALOG
+  PRODUCTS
+}
+
+enum CustomerSource {
+  ORDER
+  MANUAL
+}
+
+enum OrderStatus {
+  PLACED
+  CONFIRMED
+  PARTIALLY_CONFIRMED // reserved for Phase 2
+  PACKED
+  DISPATCHED
+  DELIVERED
+  REJECTED
+  CANCELLED
+}
+
+enum OtpPurpose {
+  CLIENT_LOGIN
+  CUSTOMER
+}
+
+// ───────────────────────── Platform & clients ─────────────────────────
+
+model User {
+  id           String    @id @default(cuid())
+  role         UserRole
+  clientId     String?
+  client       Client?   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name         String?
+  email        String    @unique
+  mobile       String?
+  passwordHash String?
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([clientId])
+  @@index([mobile])
+}
+
+model Plan {
+  id                String         @id @default(cuid())
+  name              String         @unique
+  maxProducts       Int
+  maxCustomLinks    Int
+  maxStaff          Int            @default(0)
+  maxOrdersPerMonth Int
+  price             Decimal        @default(0) @db.Decimal(12, 2)
+  durationDays      Int            @default(365)
+  isActive          Boolean        @default(true)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  subscriptions     Subscription[]
+}
+
+model Client {
+  id             String        @id @default(cuid())
+  businessName   String
+  ownerName      String
+  mobile         String
+  email          String
+  gst            String?
+  city           String
+  address        String?
+  logoUrl        String?
+  bannerUrl      String?
+  /// Shown to customers for WhatsApp / call buttons; falls back to `mobile` when empty.
+  whatsappNumber String?
+  slug           String        @unique
+  status         ClientStatus  @default(ACTIVE)
+  upiId          String?
+  upiQrUrl       String?
+  /// { accountName, accountNumber, ifsc, bankName, branch }
+  bankDetails    Json?
+  paymentModes   PaymentMode[] @default([PAY_LATER])
+  /// { outOfStockMode: "badge" | "hide", lowStockThreshold: number, writeOrdersTab: boolean, syncIntervalMin: number, newArrivalDays: number }
+  /// Read it through getClientSettings() in @cataloglink/core/profile, which fills defaults.
+  settings       Json          @default("{}")
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  users           User[]
+  subscriptions   Subscription[]
+  payments        SubscriptionPayment[]
+  sheetConnection SheetConnection?
+  syncRuns        SyncRun[]
+  syncRowErrors   SyncRowError[]
+  products        Product[]
+  productImages   ProductImage[]
+  links           CatalogLink[]
+  customers       Customer[]
+  customerLinks   CustomerLink[]
+  orders          Order[]
+  orderItems      OrderItem[]
+  orderHistory    OrderStatusHistory[]
+  counter         ClientCounter?
+}
+
+model Subscription {
+  id        String                @id @default(cuid())
+  clientId  String
+  client    Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  planId    String
+  plan      Plan                  @relation(fields: [planId], references: [id])
+  status    SubscriptionStatus    @default(ACTIVE)
+  startAt   DateTime
+  expiresAt DateTime
+  trialDays Int                   @default(0)
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+  payments  SubscriptionPayment[]
+
+  @@index([clientId, expiresAt])
+}
+
+model SubscriptionPayment {
+  id             String       @id @default(cuid())
+  clientId       String
+  client         Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  amount         Decimal      @db.Decimal(12, 2)
+  paidAt         DateTime
+  reference      String?
+  note           String?
+  createdAt      DateTime     @default(now())
+
+  @@index([clientId])
+}
+
+model ClientCounter {
+  clientId    String @id
+  client      Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  nextOrderNo Int    @default(1001)
+}
+
+model PlatformSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+// ───────────────────────── Google Sheet sync ─────────────────────────
+
+model SheetConnection {
+  id                   String              @id @default(cuid())
+  clientId             String              @unique
+  client               Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  mode                 SheetConnectionMode
+  /// Null between connecting a Google account (OAuth) and picking a spreadsheet + tab.
+  spreadsheetId        String?
+  spreadsheetTitle     String?
+  sheetName            String?
+  googleEmail          String?
+  oauthRefreshTokenEnc String?
+  headerMap            Json                @default("{}")
+  lastSyncedAt         DateTime?
+  lastStatus           SyncStatus?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+}
+
+model SyncRun {
+  id           String         @id @default(cuid())
+  clientId     String
+  client       Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  trigger      SyncTrigger
+  status       SyncStatus     @default(QUEUED)
+  startedAt    DateTime       @default(now())
+  finishedAt   DateTime?
+  rowsTotal    Int            @default(0)
+  rowsAdded    Int            @default(0)
+  rowsUpdated  Int            @default(0)
+  rowsSkipped  Int            @default(0)
+  rowsRemoved  Int            @default(0)
+  errorMessage String?
+  rowErrors    SyncRowError[]
+
+  @@index([clientId, startedAt(sort: Desc)])
+}
+
+model SyncRowError {
+  id        String  @id @default(cuid())
+  clientId  String
+  client    Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  syncRunId String
+  syncRun   SyncRun @relation(fields: [syncRunId], references: [id], onDelete: Cascade)
+  rowNumber Int
+  sku       String?
+  code      String
+  message   String
+
+  @@index([syncRunId])
+  @@index([clientId])
+}
+
+// ───────────────────────────── Catalog ─────────────────────────────
+
+model Product {
+  id                 String    @id @default(cuid())
+  clientId           String
+  client             Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  sku                String
+  name               String
+  catalogName        String?
+  category           String
+  fabric             String?
+  colours            String[]
+  sizes              String[]
+  piecesPerSet       Int?
+  price              Decimal   @db.Decimal(12, 2)
+  mrp                Decimal?  @db.Decimal(12, 2)
+  priceType          PriceType @default(PIECE)
+  moq                Int       @default(1)
+  availableQty       Int       @default(0)
+  videoUrl           String?
+  description        String?
+  gstPct             Decimal?  @db.Decimal(5, 2)
+  sheetActive        Boolean   @default(true)
+  hiddenByClient     Boolean   @default(false)
+  tags               String[]
+  rowHash            String
+  sheetRow           Int
+  firstSeenAt        DateTime  @default(now())
+  removedFromSheetAt DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  images     ProductImage[]
+  orderItems OrderItem[]
+
+  @@unique([clientId, sku])
+  @@index([clientId, category])
+  @@index([clientId, catalogName])
+}
+
+model ProductImage {
+  id              String      @id @default(cuid())
+  clientId        String
+  client          Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  position        Int
+  driveFileId     String?
+  externalUrl     String?
+  driveModifiedAt DateTime?
+  thumbUrl        String?
+  fullUrl         String?
+  blurDataUrl     String?
+  status          ImageStatus @default(PENDING)
+  error           String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([productId, position])
+  @@index([clientId, status])
+}
+
+model CatalogLink {
+  id              String            @id @default(cuid())
+  clientId        String
+  client          Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  slug            String            @unique
+  name            String
+  isDefault       Boolean           @default(false)
+  selectionType   LinkSelectionType @default(ALL)
+  /// CATEGORY/CATALOG: string[] of names; PRODUCTS: string[] of product ids
+  selectionValues Json              @default("[]")
+  showPrice       Boolean           @default(true)
+  allowOrdering   Boolean           @default(true)
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  customerLinks CustomerLink[]
+  orders        Order[]
+
+  @@index([clientId])
+}
+
+// ───────────────────────── Customers & orders ─────────────────────────
+
+model Customer {
+  id        String         @id @default(cuid())
+  clientId  String
+  client    Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name      String
+  shopName  String?
+  mobile    String
+  city      String?
+  address   String?
+  gst       String?
+  isBlocked Boolean        @default(false)
+  source    CustomerSource @default(ORDER)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  links  CustomerLink[]
+  orders Order[]
+
+  @@unique([clientId, mobile])
+}
+
+model CustomerLink {
+  id         String      @id @default(cuid())
+  clientId   String
+  client     Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  linkId     String
+  link       CatalogLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  createdAt  DateTime    @default(now())
+
+  @@unique([customerId, linkId])
+  @@index([clientId])
+}
+
+model Order {
+  id              String       @id @default(cuid())
+  clientId        String
+  client          Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  orderNo         Int
+  linkId          String?
+  link            CatalogLink? @relation(fields: [linkId], references: [id], onDelete: SetNull)
+  customerId      String
+  customer        Customer     @relation(fields: [customerId], references: [id])
+  status          OrderStatus  @default(PLACED)
+  paymentMode     PaymentMode
+  paymentReceived Boolean      @default(false)
+  subtotal        Decimal      @db.Decimal(12, 2)
+  gstTotal        Decimal      @db.Decimal(12, 2)
+  grandTotal      Decimal      @db.Decimal(12, 2)
+  customerName    String
+  shopName        String?
+  mobile          String
+  city            String?
+  deliveryAddress String
+  gst             String?
+  transportPref   String?
+  notes           String?
+  rejectReason    String?
+  cancelledBy     String?
+  sheetWrittenAt  DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  items   OrderItem[]
+  history OrderStatusHistory[]
+
+  @@unique([clientId, orderNo])
+  @@index([clientId, status, createdAt(sort: Desc)])
+  @@index([customerId])
+}
+
+model OrderItem {
+  id        String    @id @default(cuid())
+  clientId  String
+  client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  orderId   String
+  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+  sku       String
+  name      String
+  imageUrl  String?
+  colour    String?
+  size      String?
+  priceType PriceType
+  unitPrice Decimal   @db.Decimal(12, 2)
+  gstPct    Decimal?  @db.Decimal(5, 2)
+  qty       Int
+  lineTotal Decimal   @db.Decimal(12, 2)
+
+  @@index([orderId])
+  @@index([clientId])
+}
+
+model OrderStatusHistory {
+  id         String       @id @default(cuid())
+  clientId   String
+  client     Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  orderId    String
+  order      Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus OrderStatus?
+  toStatus   OrderStatus
+  byUserId   String?
+  byCustomer Boolean      @default(false)
+  note       String?
+  createdAt  DateTime     @default(now())
+
+  @@index([orderId])
+  @@index([clientId])
+}
+
+// ─────────────────────────────── Auth ───────────────────────────────
+
+model OtpRequest {
+  id         String     @id @default(cuid())
+  mobile     String
+  purpose    OtpPurpose
+  clientId   String?
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int        @default(0)
+  consumedAt DateTime?
+  createdAt  DateTime   @default(now())
+
+  @@index([mobile, purpose, createdAt(sort: Desc)])
+}

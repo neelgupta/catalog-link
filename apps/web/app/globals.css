@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #fdf4f3;
+  --color-brand-100: #fbe6e3;
+  --color-brand-500: #c2410c;
+  --color-brand-600: #a8360a;
+  --color-brand-700: #8a2d0b;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+}
+
+body {
+  @apply bg-stone-50 text-stone-900 antialiased;
+}

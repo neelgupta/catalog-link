@@ -1,0 +1,55 @@
+# ── Dependencies & build output ──────────────────────────────
+node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
+
+# ── Env & secrets (never commit) ─────────────────────────────
+.env
+.env.*
+!.env.example
+secrets/*
+!secrets/.gitkeep
+*.pem
+*.key
+*.p12
+# Google downloads dropped in the repo root by mistake: OAuth client JSON and service-account keys.
+# Only the root's own config JSON is tracked.
+/*.json
+!/package.json
+!/tsconfig*.json
+client_secret_*.json
+
+# ── Generated / local data ───────────────────────────────────
+packages/db/src/generated/
+media/
+
+# ── Tests ────────────────────────────────────────────────────
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# ── Logs ─────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# ── Editor / OS ──────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+.~lock.*
+
+# ── Large media (reference videos) ───────────────────────────
+*.mp4
+*.mov
