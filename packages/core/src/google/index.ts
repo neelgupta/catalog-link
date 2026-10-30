@@ -53,6 +53,15 @@ class DevRoutingSource implements GoogleSource {
   download(id: string) {
     return isFakeDrive(id) ? this.fake.download(id) : this.real().download(id);
   }
+  ensureTab(id: string, tab: string, headers: string[]) {
+    return isFakeSheet(id) ? this.fake.ensureTab(id, tab, headers) : this.real().ensureTab(id, tab, headers);
+  }
+  appendRows(id: string, tab: string, rows: Parameters<GoogleSource["appendRows"]>[2]) {
+    return isFakeSheet(id) ? this.fake.appendRows(id, tab, rows) : this.real().appendRows(id, tab, rows);
+  }
+  updateCells(id: string, tab: string, updates: Parameters<GoogleSource["updateCells"]>[2]) {
+    return isFakeSheet(id) ? this.fake.updateCells(id, tab, updates) : this.real().updateCells(id, tab, updates);
+  }
 }
 
 /** The GoogleSource for a client's sheet connection. */

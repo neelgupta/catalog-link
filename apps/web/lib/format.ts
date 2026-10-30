@@ -29,3 +29,15 @@ export function formatRupees(amount: number | string | { toString(): string }) {
     Number(amount.toString()),
   );
 }
+
+/** ₹850 for whole rupees, ₹737.50 when there are paise (for product prices). */
+export function formatPrice(amount: number | string | { toString(): string }) {
+  const n = Number(amount.toString());
+  const whole = Number.isInteger(n);
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    minimumFractionDigits: whole ? 0 : 2,
+    maximumFractionDigits: whole ? 0 : 2,
+  }).format(n);
+}

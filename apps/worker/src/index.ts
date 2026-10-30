@@ -2,6 +2,8 @@ import "./load-env";
 import { getEnv } from "@cataloglink/core/env";
 import { googleSourceFor } from "@cataloglink/core/google";
 import { processImage } from "@cataloglink/core/images";
+import { writeOrderToSheet } from "@cataloglink/core/orders";
+import type { OrderSheetJobData } from "@cataloglink/core/orders-sheet";
 import { bullConnection, getQueue, QUEUES } from "@cataloglink/core/queues";
 import { getRedis } from "@cataloglink/core/redis";
 import {
@@ -77,6 +79,21 @@ async function main() {
     imagesReady.clear();
   }, 5000);
 
+  // ── Orders tab in the client's sheet ──────────────────────────────────
+  const ordersSheet = new Worker<OrderSheetJobData>(
+    QUEUES.ordersSheet,
+    async (job) => {
+      const conn = await prisma.sheetConnection.findUnique({ where: { clientId: job.data.clientId } });
+      if (!conn?.spreadsheetId) return "skipped";
+      // Errors are recorded on the order and rethrown, so BullMQ retries with backoff.
+      const result = await writeOrderToSheet(job.data.orderId, () => googleSourceFor(conn));
+      logger.info({ ...job.data, result }, "orders tab");
+      return result;
+    },
+    // One write at a time keeps rows in order and stays inside Google's write quota.
+    { connection, concurrency: 1, limiter: { max: 1, duration: 1000 } },
+  );
+
   // ── Maintenance: heartbeat + sync scheduler ───────────────────────────
   const maintenance = new Worker(
     QUEUES.maintenance,
@@ -99,20 +116,20 @@ async function main() {
     { connection, concurrency: 1 },
   );
 
-  for (const [name, worker] of Object.entries({ sync, images, maintenance })) {
+  for (const [name, worker] of Object.entries({ sync, images, ordersSheet, maintenance })) {
     worker.on("failed", (job, err) => logger.error({ queue: name, job: job?.name, data: job?.data, err: err.message }, "job failed"));
   }
 
   const maintenanceQueue = getQueue(QUEUES.maintenance);
   await maintenanceQueue.upsertJobScheduler("heartbeat", { every: 60_000 }, { name: "heartbeat", opts: { removeOnComplete: true, removeOnFail: 100 } });
   await maintenanceQueue.upsertJobScheduler("sync-tick", { every: 60_000 }, { name: "sync-tick", opts: { removeOnComplete: true, removeOnFail: 100 } });
-  logger.info({ queues: [QUEUES.sync, QUEUES.images, QUEUES.maintenance] }, "worker started");
+  logger.info({ queues: [QUEUES.sync, QUEUES.images, QUEUES.ordersSheet, QUEUES.maintenance] }, "worker started");
 
   const shutdown = async (signal: string) => {
     logger.info({ signal }, "shutting down");
     clearInterval(flushImages);
-    await Promise.all([sync.close(), images.close(), maintenance.close()]);
-    await Promise.all([maintenanceQueue.close(), getQueue(QUEUES.sync).close(), getQueue(QUEUES.images).close()]);
+    await Promise.all([sync.close(), images.close(), ordersSheet.close(), maintenance.close()]);
+    await Promise.all([maintenanceQueue.close(), getQueue(QUEUES.sync).close(), getQueue(QUEUES.images).close(), getQueue(QUEUES.ordersSheet).close()]);
     getRedis().disconnect();
     await prisma.$disconnect();
     process.exit(0);

@@ -1,6 +1,6 @@
 # CatalogLink – Progress and Versions
 
-Status as of **29 October 2026**. Milestones 1–6 of the MVP (Phase 1) are done; Milestones 7–8 are next.
+Status as of **29 October 2026**. Milestones 1–7 of the MVP (Phase 1) are done; Milestone 8 is next.
 For setup see [README.md](../README.md); for how things work see [IMPLEMENTATION.md](IMPLEMENTATION.md).
 
 ## Milestone status
@@ -13,8 +13,8 @@ For setup see [README.md](../README.md); for how things work see [IMPLEMENTATION
 | 4 | Client products & catalog links | Done |
 | 5 | Public catalog link (`/c/[slug]`) | Done |
 | 6 | Cart & checkout | Done |
-| 7 | Order management | Next |
-| 8 | Hardening & release prep | Not started |
+| 7 | Order management | Done |
+| 8 | Hardening & release prep | Next |
 
 **On hold by request:** notifications (email alerts, WhatsApp message templates, SMTP, the "send login details" button). OTP SMS for login is built.
 **Removed by request:** OneDrive images. Photos come from Google Drive only.
@@ -139,6 +139,18 @@ For setup see [README.md](../README.md); for how things work see [IMPLEMENTATION
 - **Price-hidden links:** customers never see prices; the seller's order still records them.
 - The seller's dashboard shows a "New orders" count. The full orders screen is Milestone 7.
 
+### Milestone 7 – Order management
+- **New orders reach the seller straight away:** an "Orders" badge in the menu, a "New orders" card on the dashboard, and the count in the browser tab. They refresh on their own every 30 seconds. (WhatsApp alerts are on hold.)
+- **Orders screen:** tabs for New, Confirmed, Packed, Dispatched, Delivered and Cancelled with counts; search by order number, customer, shop or mobile; a date range.
+- **Order page:**
+  - items with colour/size, GST and totals; the customer's details, address, notes and transport preference; history
+  - one button for the next step: Confirm → Packed → Dispatched (with transport / LR note) → Delivered
+  - reject or cancel with a reason the customer sees; the stock goes back
+  - mark payment received
+- **Documents:** order PDF, packing slip, and an Excel export of the filtered orders.
+- **Google Sheet "Orders" tab:** when switched on in Settings, each order is written as rows and its status / payment kept up to date. Problems show on the order and are retried.
+- **Customers:** the list (from orders, or added by hand) with orders and totals; assign catalog links; order history; block / unblock.
+
 ---
 
 ## Versions
@@ -170,6 +182,7 @@ Migrations applied:
 1. `20261029000000_init`
 2. `20261029080300_sheet_connection_pending`
 3. `20261029103424_client_profile`
+4. `20261030061637_order_sheet_error`
 
 ### Web app (`apps/web`)
 
@@ -193,7 +206,8 @@ Migrations applied:
 | @googleapis/drive | 27.0.0 | Drive files and folders |
 | google-auth-library | 11.3.1 | OAuth and service account auth |
 | sharp | 0.35.5 | Thumbnails (WebP) |
-| exceljs | 4.4.0 | Sheet template (.xlsx) |
+| exceljs | 4.4.0 | Sheet template and orders export (.xlsx) |
+| pdfkit | 0.20.2 | Order PDF and packing slip (DejaVu Sans fonts bundled for ₹) |
 | qrcode | 1.5.4 | Link QR codes |
 | @node-rs/argon2 | 2.2.2 | Password hashing |
 | jose | 6.2.13 | Session tokens |
@@ -216,10 +230,10 @@ Migrations applied:
 
 | Suite | Result |
 |---|---|
-| Unit tests (`pnpm test`) | 125 passed (validation 32, db 6, core 87) |
-| Database tests (`pnpm test:db`) | 50 passed (db 6, core 44) |
+| Unit tests (`pnpm test`) | 129 passed (validation 32, db 6, core 91) |
+| Database tests (`pnpm test:db`) | 64 passed (db 6, core 58) |
 | Type-check and lint | Clean |
-| Browser tests at phone width (390 px) | M2: 21/21, M3: 16/16, M4: 17/17, M5: 14/14, M6: 16/16 |
+| Browser tests at phone width (390 px) | M2: 21/21, M3: 16/16, M4: 17/17, M5: 14/14, M6: 16/16, M7: 14/14 |
 
 ---
 

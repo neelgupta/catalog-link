@@ -79,3 +79,12 @@ describe("isSyncDue", () => {
     expect(isSyncDue(new Date("2026-10-29T09:56:00Z"), 5, now)).toBe(false);
   });
 });
+
+describe("parseSheetGid", () => {
+  it("reads the tab id from a sheet link", async () => {
+    const { parseSheetGid } = await import("./links");
+    expect(parseSheetGid("https://docs.google.com/spreadsheets/d/abc/edit#gid=123456")).toBe(123456);
+    expect(parseSheetGid("https://docs.google.com/spreadsheets/d/abc/edit?gid=0#gid=0")).toBe(0);
+    expect(parseSheetGid("https://docs.google.com/spreadsheets/d/abc/edit")).toBeNull();
+  });
+});

@@ -25,13 +25,16 @@ class MemorySource implements GoogleSource {
   }
   async getSpreadsheet(id: string) {
     this.check();
-    return { id, title: "Test", tabs: ["Products"] };
+    return { id, title: "Test", tabs: ["Products"], tabIds: [0] };
   }
   async readValues() {
     this.check();
     this.calls.readValues++;
     return this.values.map((r) => [...r]);
   }
+  async ensureTab() {}
+  async appendRows() {}
+  async updateCells() {}
   async listSpreadsheets() {
     return [];
   }

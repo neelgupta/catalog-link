@@ -6,10 +6,10 @@ import Link from "next/link";
 import { ProductThumb } from "@/components/product-thumb";
 import { buttonClass, EmptyState, LinkButton, PageHeader } from "@/components/ui";
 import { requireClient } from "@/lib/auth";
-import { formatRupees } from "@/lib/format";
+import { formatDateTime, formatPrice } from "@/lib/format";
 import { FilterSelect } from "./filter-select";
 import { HideToggle } from "./hide-toggle";
-import { isOnLinks, priceUnit, ProductBadges } from "./product-status";
+import { isOnLinks, priceUnit } from "./product-status";
 
 export const metadata: Metadata = { title: "Products" };
 
@@ -39,9 +39,16 @@ export default async function ProductsPage({
   const db = forClient(clientId);
   const [settings, facets] = await Promise.all([getClientSettings(clientId), productFacets(clientId)]);
   const low = settings.lowStockThreshold;
+  const inSheet = { removedFromSheetAt: null } satisfies Prisma.ProductWhereInput;
+  const onLinksWhere: Prisma.ProductWhereInput = {
+    ...inSheet,
+    sheetActive: true,
+    hiddenByClient: false,
+    ...(settings.outOfStockMode === "hide" && { availableQty: { gt: 0 } }),
+  };
 
   const where: Prisma.ProductWhereInput = {
-    removedFromSheetAt: null,
+    ...inSheet,
     ...(q && { OR: [{ name: { contains: q, mode: "insensitive" } }, { sku: { contains: q, mode: "insensitive" } }, { fabric: { contains: q, mode: "insensitive" } }] }),
     ...(category && { category }),
     ...(catalog && { catalogName: catalog }),
@@ -53,9 +60,14 @@ export default async function ProductsPage({
     ...(show === "inactive" && { sheetActive: false }),
   };
 
-  const [total, all, products, conn] = await Promise.all([
+  const [total, all, onLinks, lowCount, outCount, hiddenCount, inactiveCount, products, conn] = await Promise.all([
     db.product.count({ where }),
-    db.product.count({ where: { removedFromSheetAt: null } }),
+    db.product.count({ where: inSheet }),
+    db.product.count({ where: onLinksWhere }),
+    low > 0 ? db.product.count({ where: { ...inSheet, availableQty: { gt: 0, lte: low } } }) : 0,
+    db.product.count({ where: { ...inSheet, availableQty: { lte: 0 } } }),
+    db.product.count({ where: { ...inSheet, hiddenByClient: true } }),
+    db.product.count({ where: { ...inSheet, sheetActive: false } }),
     db.product.findMany({
       where,
       orderBy: [{ sheetRow: "asc" }],
@@ -63,7 +75,7 @@ export default async function ProductsPage({
       take: PAGE_SIZE,
       include: { images: { orderBy: { position: "asc" }, take: 1, select: { thumbUrl: true, blurDataUrl: true } } },
     }),
-    db.sheetConnection.findFirst({ select: { spreadsheetId: true } }),
+    db.sheetConnection.findFirst({ select: { spreadsheetId: true, lastSyncedAt: true } }),
   ]);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const filtered = Boolean(q || category || catalog || stock !== "all" || show !== "all");
@@ -74,6 +86,16 @@ export default async function ProductsPage({
     for (const [k, v] of Object.entries(params)) if (v && !(k === "page" && Number(v) <= 1)) s.set(k, String(v));
     return `/app/products${s.size ? `?${s}` : ""}`;
   };
+
+  // Status chips set either the stock or the visibility filter (search, category and catalog stay).
+  const chips: { label: string; count: number; stock: Stock; show: Show }[] = [
+    { label: "All", count: all, stock: "all", show: "all" },
+    { label: "On links", count: onLinks, stock: "all", show: "visible" },
+    ...(low > 0 ? [{ label: "Low stock", count: lowCount as number, stock: "low" as Stock, show: "all" as Show }] : []),
+    { label: "Out of stock", count: outCount, stock: "out", show: "all" },
+    { label: "Hidden by you", count: hiddenCount, stock: "all", show: "hidden" },
+    { label: "Active = No", count: inactiveCount, stock: "all", show: "inactive" },
+  ];
 
   if (all === 0) {
     return (
@@ -93,66 +115,117 @@ export default async function ProductsPage({
     <>
       <PageHeader
         title="Products"
-        subtitle={filtered ? `${total} of ${all} products` : `${all} products from your Google Sheet`}
-        action={<LinkButton href="/app/sheet" variant="secondary">Sync status</LinkButton>}
+        subtitle={
+          <>
+            {all} product{all === 1 ? "" : "s"} from your Google Sheet
+            {conn?.lastSyncedAt && <span className="text-stone-400"> · synced {formatDateTime(conn.lastSyncedAt)}</span>}
+          </>
+        }
+        action={
+          <LinkButton href="/app/sheet" variant="secondary">
+            Sync status
+          </LinkButton>
+        }
       />
 
-      <form action="/app/products" className="mb-4 space-y-2 rounded-2xl border border-stone-200 bg-white p-3">
-        <div className="flex gap-2">
-          <input
-            name="q"
-            defaultValue={q}
-            placeholder="Search name, SKU, fabric…"
-            className="h-10 min-w-0 flex-1 rounded-lg border border-stone-300 bg-white px-3 text-base outline-none focus:border-brand-500 sm:text-sm"
-          />
-          <button className={buttonClass("primary")}>Search</button>
+      <form action="/app/products" className="mb-4 rounded-2xl border border-stone-200 bg-white p-3 sm:p-4">
+        {/* Keep the status chip's filter when searching or picking a category. */}
+        {stock !== "all" && <input type="hidden" name="stock" value={stock} />}
+        {show !== "all" && <input type="hidden" name="show" value={show} />}
+        <div className="grid gap-2 md:grid-cols-[1fr_auto_auto_auto]">
+          <div className="relative min-w-0">
+            <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-stone-400" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+              <circle cx="11" cy="11" r="6.5" />
+              <path d="m20 20-4-4" />
+            </svg>
+            <input
+              name="q"
+              type="search"
+              defaultValue={q}
+              placeholder="Search name, SKU, fabric…"
+              aria-label="Search products"
+              className="h-10 w-full rounded-lg border border-stone-300 bg-white pr-3 pl-9 text-base outline-none focus:border-brand-500 sm:text-sm"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2 md:contents">
+            <FilterSelect name="category" value={category} label="Category" allLabel="All categories" options={facets.categories.map((c) => [c.name, `${c.name} (${c.count})`])} />
+            <FilterSelect name="catalog" value={catalog} label="Catalog" allLabel="All catalogs" options={facets.catalogs.map((c) => [c.name, `${c.name} (${c.count})`])} />
+          </div>
+          <button className={buttonClass("primary", "w-full md:w-auto")}>Search</button>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <FilterSelect name="category" value={category} label="Category" allLabel="All categories" options={facets.categories.map((c) => [c.name, `${c.name} (${c.count})`])} />
-          <FilterSelect name="catalog" value={catalog} label="Catalog" allLabel="All catalogs" options={facets.catalogs.map((c) => [c.name, `${c.name} (${c.count})`])} />
-          <FilterSelect
-            name="stock"
-            value={stock === "all" ? "" : stock}
-            label="Stock"
-            options={(Object.keys(STOCK) as Stock[]).filter((s) => s !== "all" && (s !== "low" || low > 0)).map((s) => [s, s === "low" ? `Low (≤ ${low})` : STOCK[s]])}
-            allLabel={STOCK.all}
-          />
-          <FilterSelect name="show" value={show === "all" ? "" : show} label="Visibility" options={(Object.keys(SHOW) as Show[]).filter((s) => s !== "all").map((s) => [s, SHOW[s]])} allLabel={SHOW.all} />
-        </div>
+        <nav aria-label="Product status" className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-0.5">
+          {chips.map((c) => {
+            const active = c.stock === stock && c.show === show;
+            return (
+              <Link
+                key={c.label}
+                href={href({ stock: c.stock === "all" ? "" : c.stock, show: c.show === "all" ? "" : c.show })}
+                aria-current={active ? "true" : undefined}
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm whitespace-nowrap transition ${
+                  active ? "bg-stone-900 text-white" : "bg-stone-100 text-stone-700 hover:bg-stone-200"
+                }`}
+              >
+                {c.label}
+                <span className={`text-xs tabular-nums ${active ? "text-white/70" : "text-stone-500"}`}>{c.count}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      </form>
+
+      <div className="mb-3 flex items-center justify-between text-sm text-stone-500">
+        <span>{filtered ? `${total} of ${all} products` : `${all} products`}</span>
         {filtered && (
-          <Link href="/app/products" className="inline-block text-sm text-stone-500 underline">
+          <Link href="/app/products" className="underline hover:text-stone-800">
             Clear filters
           </Link>
         )}
-      </form>
+      </div>
 
       {products.length === 0 ? (
         <EmptyState>No products match these filters.</EmptyState>
       ) : (
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4 2xl:grid-cols-6">
+        <ul className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4 xl:gap-5">
           {products.map((p) => {
-            const onLinks = isOnLinks(p, settings);
+            const visible = isOnLinks(p, settings);
+            const out = p.availableQty <= 0;
+            const isLow = !out && low > 0 && p.availableQty <= low;
+            const reason = !p.sheetActive ? "Active = No in sheet" : p.hiddenByClient ? "Hidden by you" : out && settings.outOfStockMode === "hide" ? "Hidden: out of stock" : null;
             return (
-              <li key={p.id} className={`flex flex-col overflow-hidden rounded-2xl border bg-white ${onLinks ? "border-stone-200" : "border-dashed border-stone-300"}`}>
-                <Link href={`/app/products/${p.id}`} className="block min-w-0 flex-1">
-                  <ProductThumb image={p.images[0]} alt={p.name} className={`aspect-[3/4] w-full ${onLinks ? "" : "opacity-50"}`} />
-                  <div className="space-y-1 p-3">
-                    <p className="line-clamp-2 text-sm font-medium">{p.name}</p>
-                    <p className="text-xs text-stone-500">
-                      {p.sku} · {p.category}
-                    </p>
-                    <p className="text-sm font-semibold">
-                      {formatRupees(p.price)} <span className="text-xs font-normal text-stone-500">{priceUnit(p.priceType)}</span>
-                    </p>
-                    <p className="text-xs text-stone-500">Qty {p.availableQty}</p>
-                    <ProductBadges product={p} settings={settings} />
+              <li key={p.id} className="group flex flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white transition hover:border-stone-300 hover:shadow-sm">
+                <Link href={`/app/products/${p.id}`} className="relative block">
+                  <ProductThumb image={p.images[0]} alt={p.name} className={`aspect-[3/4] w-full transition ${visible ? "" : "opacity-40 grayscale"}`} />
+                  <div className="absolute inset-x-2 top-2 flex flex-wrap gap-1">
+                    {out && !reason && <span className="rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-semibold text-white">Out of stock</span>}
+                    {isLow && <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[11px] font-semibold text-white">Only {p.availableQty} left</span>}
                   </div>
+                  {reason && (
+                    <span className="absolute inset-x-2 bottom-2 rounded-lg bg-stone-900/80 px-2 py-1 text-center text-xs font-medium text-white">
+                      Not on links · {reason}
+                    </span>
+                  )}
                 </Link>
-                {p.sheetActive && (
-                  <div className="px-3 pb-3">
-                    <HideToggle productId={p.id} hidden={p.hiddenByClient} compact />
+                <div className="flex flex-1 flex-col p-3">
+                  <Link href={`/app/products/${p.id}`} className="line-clamp-2 text-sm leading-snug font-semibold text-stone-900 hover:underline">
+                    {p.name}
+                  </Link>
+                  <p className="mt-0.5 truncate text-xs text-stone-500">
+                    {p.sku} · {p.category}
+                    {p.catalogName ? ` · ${p.catalogName}` : ""}
+                  </p>
+                  <p className="mt-2 flex flex-wrap items-baseline gap-x-1.5">
+                    <span className="text-base font-semibold">{formatPrice(p.price)}</span>
+                    <span className="text-xs text-stone-500">{priceUnit(p.priceType)}</span>
+                    {p.mrp && Number(p.mrp) > Number(p.price) && <span className="text-xs text-stone-400 line-through">{formatPrice(p.mrp)}</span>}
+                  </p>
+                  <div className="mt-auto flex items-center justify-between gap-2 pt-3">
+                    <span className="flex min-w-0 items-center gap-1.5 text-xs text-stone-600">
+                      <span className={`size-2 shrink-0 rounded-full ${out ? "bg-red-500" : isLow ? "bg-amber-500" : "bg-green-500"}`} aria-hidden="true" />
+                      <span className="truncate">{out ? "Out of stock" : `${p.availableQty} in stock`}</span>
+                    </span>
+                    {p.sheetActive && <HideToggle productId={p.id} hidden={p.hiddenByClient} compact />}
                   </div>
-                )}
+                </div>
               </li>
             );
           })}
@@ -160,12 +233,24 @@ export default async function ProductsPage({
       )}
 
       {pages > 1 && (
-        <div className="mt-4 flex items-center justify-between text-sm">
-          {page > 1 ? <Link className={buttonClass("secondary")} href={href({ page: page - 1 })}>Previous</Link> : <span />}
+        <div className="mt-6 flex items-center justify-between text-sm">
+          {page > 1 ? (
+            <Link className={buttonClass("secondary")} href={href({ page: page - 1 })}>
+              Previous
+            </Link>
+          ) : (
+            <span />
+          )}
           <span className="text-stone-500">
             Page {page} of {pages}
           </span>
-          {page < pages ? <Link className={buttonClass("secondary")} href={href({ page: page + 1 })}>Next</Link> : <span />}
+          {page < pages ? (
+            <Link className={buttonClass("secondary")} href={href({ page: page + 1 })}>
+              Next
+            </Link>
+          ) : (
+            <span />
+          )}
         </div>
       )}
     </>

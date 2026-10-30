@@ -1,6 +1,7 @@
 // What a customer sees and can do with their own orders on a catalog link.
 import { prisma, type OrderStatus } from "@cataloglink/db";
 import { DomainError } from "../errors";
+import { restoreStock } from "./manage";
 
 /** Customer-facing status names (docs/IMPLEMENTATION.md §12). */
 export const CUSTOMER_STATUS: Record<OrderStatus, string> = {
@@ -55,10 +56,7 @@ export async function cancelOrderByCustomer(clientId: string, mobile: string, or
     if (order.status !== "PLACED") {
       throw new DomainError("CANNOT_CANCEL", "The seller has already started on this order. Please contact them to cancel.");
     }
-    const items = await tx.orderItem.findMany({ where: { orderId: order.id, productId: { not: null } }, select: { productId: true, qty: true } });
-    for (const item of items) {
-      await tx.product.updateMany({ where: { id: item.productId!, clientId }, data: { availableQty: { increment: item.qty } } });
-    }
+    await restoreStock(tx, clientId, order.id);
     await tx.order.update({ where: { id: order.id }, data: { status: "CANCELLED", cancelledBy: "customer", rejectReason: reason ?? null } });
     await tx.orderStatusHistory.create({
       data: { clientId, orderId: order.id, fromStatus: "PLACED", toStatus: "CANCELLED", byCustomer: true, note: reason ?? null },

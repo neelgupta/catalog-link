@@ -1,6 +1,5 @@
-import { isDomainError } from "@cataloglink/core/errors";
-import { oauthConfigured, serviceAccountEmail } from "@cataloglink/core/google";
-import { getPendingSync, listAccountSpreadsheets } from "@cataloglink/core/sync";
+import { fakeGoogleEnabled, oauthConfigured } from "@cataloglink/core/google";
+import { getPendingSync } from "@cataloglink/core/sync";
 import { prisma } from "@cataloglink/db";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -9,7 +8,6 @@ import {
   Badge,
   Card,
   Detail,
-  EmptyState,
   FormError,
   FormSuccess,
   PageHeader,
@@ -17,12 +15,13 @@ import {
 import { requireClient } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
 import {
+  connectDemoGoogleAction,
+  connectSheetLinkAction,
   disconnectSheetAction,
-  inspectLinkAction,
   startGoogleOAuthAction,
   syncNowAction,
 } from "./actions";
-import { CopyText, GoogleButton, PasteLinkForm } from "./connect-forms";
+import { GoogleButton, PasteLinkForm } from "./connect-forms";
 import { SyncControls } from "./sync-controls";
 
 export const metadata: Metadata = { title: "Google Sheet" };
@@ -35,11 +34,10 @@ const ERRORS: Record<string, string> = {
     "Google didn't grant offline access. Remove CatalogLink from your Google account's third-party access, then connect again.",
   GOOGLE_SCOPES_MISSING:
     "Please tick both permissions (Google Sheets and Google Drive) when connecting.",
-  GOOGLE_OAUTH_NOT_CONFIGURED:
-    "Google sign-in isn't set up yet. Use the share-with-us option instead.",
+  GOOGLE_OAUTH_NOT_CONFIGURED: "Google sign-in isn't set up on the server yet.",
 };
 const NOTICES: Record<string, string> = {
-  google: "Google account connected. Now choose the spreadsheet with your products.",
+  google: "Google account connected. Now paste your sheet link (step 2).",
   sheet: "Sheet connected. Your first sync has started.",
 };
 const RUN_TONE = {
@@ -85,7 +83,7 @@ export default async function SheetPage({
       {ready ? (
         <Connected clientId={clientId} conn={conn} />
       ) : (
-        <Connect clientId={clientId} conn={conn} />
+        <Connect conn={conn} />
       )}
     </>
   );
@@ -93,118 +91,95 @@ export default async function SheetPage({
 
 // ───────────────────────────── Not connected yet ─────────────────────────────
 
-async function Connect({
-  clientId,
-  conn,
-}: {
-  clientId: string;
-  conn: Awaited<ReturnType<typeof prisma.sheetConnection.findUnique>>;
-}) {
-  const saEmail = serviceAccountEmail();
-  const googleReady = oauthConfigured();
-  const oauthConnected = conn?.mode === "OAUTH" && !!conn.oauthRefreshTokenEnc;
+function StepNumber({ n, done }: { n: number; done: boolean }) {
+  return (
+    <span
+      aria-label={done ? `Step ${n} done` : `Step ${n}`}
+      className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
+        done ? "bg-green-100 text-green-800" : "bg-brand-500 text-white"
+      }`}
+    >
+      {done ? "✓" : n}
+    </span>
+  );
+}
 
-  let spreadsheets: { id: string; name: string }[] | null = null;
-  let listError: string | undefined;
-  if (oauthConnected) {
-    try {
-      spreadsheets = (await listAccountSpreadsheets(clientId)) ?? [];
-    } catch (err) {
-      if (!isDomainError(err)) throw err;
-      listError = err.message;
-    }
-  }
+/** Two steps: connect the Google account (OAuth), then paste the sheet link. */
+function Connect({ conn }: { conn: Awaited<ReturnType<typeof prisma.sheetConnection.findUnique>> }) {
+  const googleReady = oauthConfigured();
+  const demoAvailable = fakeGoogleEnabled();
+  const connected = conn?.mode === "OAUTH" && !!conn.oauthRefreshTokenEnc;
 
   return (
-    <div className="space-y-4">
-      <Card title="1. Start from our template">
-        <p className="mb-3 text-sm text-stone-600">
-          Download the template, upload it to Google Drive and open it with Google Sheets. One row =
-          one product. Put product photos in Google Drive and paste their links in the &quot;Image
-          Links&quot; column.
-        </p>
-        <a
-          href="/api/v1/sheet-template"
-          className="inline-flex h-10 items-center rounded-lg border border-stone-300 bg-white px-4 text-sm font-medium hover:bg-stone-50"
-        >
-          Download template (.xlsx)
+    <div className="max-w-3xl space-y-4">
+      <p className="rounded-xl bg-stone-100 px-4 py-3 text-sm text-stone-700">
+        New to CatalogLink? Start from our{" "}
+        <a href="/api/v1/sheet-template" className="font-medium text-brand-700 underline">
+          sheet template (.xlsx)
         </a>
-      </Card>
+        : upload it to Google Drive and open it with Google Sheets. One row = one product, with Google Drive links to its photos in
+        the &quot;Image Links&quot; column.
+      </p>
 
-      <Card title="2. Connect your sheet">
-        <div className="grid gap-6 md:grid-cols-2">
-          <section className="min-w-0">
-            <h3 className="mb-1 text-sm font-semibold">Option A: Sign in with Google</h3>
-            {oauthConnected ? (
-              <div className="space-y-3">
+      <section className="rounded-2xl border border-stone-200 bg-white p-4 sm:p-5">
+        <div className="flex gap-3">
+          <StepNumber n={1} done={connected} />
+          <div className="min-w-0 flex-1 space-y-3">
+            <h2 className="pt-1 text-base font-semibold">Connect your Google account</h2>
+            {connected ? (
+              <>
                 <p className="text-sm text-stone-600">
-                  Connected as <strong>{conn.googleEmail ?? "your Google account"}</strong>. Choose
-                  the spreadsheet:
+                  Connected as <strong className="break-all">{conn.googleEmail ?? "your Google account"}</strong>.
                 </p>
-                <FormError message={listError} />
-                {spreadsheets && spreadsheets.length === 0 && (
-                  <EmptyState>No spreadsheets found in this Google account.</EmptyState>
-                )}
-                {spreadsheets && spreadsheets.length > 0 && (
-                  <ul className="max-h-72 divide-y divide-stone-100 overflow-y-auto rounded-xl border border-stone-200">
-                    {spreadsheets.map((s) => (
-                      <li key={s.id}>
-                        <Link
-                          href={`/app/sheet/select?mode=OAUTH&id=${encodeURIComponent(s.id)}`}
-                          className="block px-3 py-2.5 text-sm hover:bg-stone-50"
-                        >
-                          {s.name}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <GoogleButton action={startGoogleOAuthAction} />
-              </div>
-            ) : googleReady ? (
-              <div className="space-y-3">
+                {googleReady && <GoogleButton action={startGoogleOAuthAction} label="Use another account" variant="ghost" />}
+              </>
+            ) : (
+              <>
                 <p className="text-sm text-stone-600">
-                  Pick your sheet from your Google account. You can choose any spreadsheet you own.
+                  CatalogLink reads your product sheet and the photos in your Google Drive with your permission. Nothing is changed in
+                  your Drive.
                 </p>
-                <GoogleButton action={startGoogleOAuthAction} />
-              </div>
-            ) : (
-              <p className="text-sm text-stone-500">
-                Google sign-in is being set up and will be available soon. Use option B meanwhile.
-              </p>
+                {googleReady ? (
+                  <GoogleButton action={startGoogleOAuthAction} />
+                ) : (
+                  <p className="text-sm text-stone-500">Google sign-in isn&apos;t set up on the server yet.</p>
+                )}
+                {demoAvailable && (
+                  <form action={connectDemoGoogleAction} className="border-t border-dashed border-stone-200 pt-3">
+                    <p className="mb-2 text-xs text-stone-500">Development only: try the steps with the demo sheets, without Google.</p>
+                    <SubmitButton variant="secondary" pendingText="Connecting…">
+                      Use demo Google account
+                    </SubmitButton>
+                  </form>
+                )}
+              </>
             )}
-          </section>
-
-          <section className="min-w-0">
-            <h3 className="mb-1 text-sm font-semibold">
-              Option B: Share the sheet with CatalogLink
-            </h3>
-            {saEmail ? (
-              <div className="space-y-3">
-                <ol className="list-decimal space-y-1 pl-5 text-sm text-stone-600">
-                  <li>
-                    In Google Sheets, press <strong>Share</strong> and add this email as{" "}
-                    <strong>Editor</strong>:
-                  </li>
-                </ol>
-                <CopyText text={saEmail} />
-                <ol start={2} className="list-decimal space-y-1 pl-5 text-sm text-stone-600">
-                  <li>
-                    Share your product image folder(s) with the same email (Viewer), or set them to
-                    &quot;Anyone with the link&quot;.
-                  </li>
-                  <li>Paste the sheet link below.</li>
-                </ol>
-                <PasteLinkForm action={inspectLinkAction} />
-              </div>
-            ) : (
-              <p className="text-sm text-stone-500">
-                Not available yet: the service account is not configured on the server.
-              </p>
-            )}
-          </section>
+          </div>
         </div>
-      </Card>
+      </section>
+
+      <section className={`rounded-2xl border bg-white p-4 sm:p-5 ${connected ? "border-stone-200" : "border-dashed border-stone-200 opacity-60"}`}>
+        <div className="flex gap-3">
+          <StepNumber n={2} done={false} />
+          <div className="min-w-0 flex-1 space-y-3">
+            <h2 className="pt-1 text-base font-semibold">Paste your Google Sheet link</h2>
+            <p className="text-sm text-stone-600">
+              Open your products sheet in Google Sheets and copy the link from the address bar. Photo links in the sheet are read with
+              your Google account, so you don&apos;t need to share anything.
+            </p>
+            {connected ? (
+              <PasteLinkForm action={connectSheetLinkAction} submitLabel="Connect sheet" pendingText="Connecting…" />
+            ) : (
+              <p className="text-sm text-stone-500">Connect your Google account first.</p>
+            )}
+            {connected && demoAvailable && (
+              <p className="text-xs text-stone-500">
+                Demo sheet link: <code className="break-all">https://docs.google.com/spreadsheets/d/DEMO_catalog_sample_products/edit#gid=0</code>
+              </p>
+            )}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

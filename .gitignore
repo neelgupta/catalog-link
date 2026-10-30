@@ -28,6 +28,8 @@ client_secret_*.json
 # ── Generated / local data ───────────────────────────────────
 packages/db/src/generated/
 media/
+# Tabs the dev fixture source "wrote" (e.g. Orders); the fixtures themselves stay unchanged.
+dev-fixtures/google/.writes/
 
 # ── Tests ────────────────────────────────────────────────────
 test-results/

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "./icons";
 
-export type NavItem = { href: string; label: string; icon: IconName; exact?: boolean };
+export type NavItem = { href: string; label: string; icon: IconName; exact?: boolean; badge?: number };
 
 function useIsActive() {
   const pathname = usePathname();
@@ -29,12 +29,21 @@ export function NavLinks({ items }: { items: NavItem[] }) {
                 }`}
               >
                 {item.label}
+                {!!item.badge && <Count n={item.badge} />}
               </Link>
             </li>
           );
         })}
       </ul>
     </nav>
+  );
+}
+
+function Count({ n }: { n: number }) {
+  return (
+    <span className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-brand-500 px-1.5 text-[11px] font-semibold text-white">
+      {n > 99 ? "99+" : n}
+    </span>
   );
 }
 
@@ -56,7 +65,8 @@ export function SideNav({ items }: { items: NavItem[] }) {
                 }`}
               >
                 <Icon name={item.icon} className={`size-5 shrink-0 ${active ? "text-brand-600" : "text-stone-400"}`} />
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {!!item.badge && <Count n={item.badge} />}
               </Link>
             </li>
           );

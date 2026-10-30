@@ -1,7 +1,10 @@
 import { drive as driveApi } from "@googleapis/drive";
 import { sheets as sheetsApi } from "@googleapis/sheets";
 import type { GoogleAuth, OAuth2Client } from "google-auth-library";
-import { type DriveFile, type GoogleSource, GoogleError, toGoogleError } from "./source";
+import { type CellValue, type DriveFile, type GoogleSource, GoogleError, toGoogleError } from "./source";
+
+/** A tab name in A1 notation ('My tab'). */
+const quoteTab = (tab: string) => `'${tab.replace(/'/g, "''")}'`;
 
 export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 
@@ -37,11 +40,13 @@ export class ApiGoogleSource implements GoogleSource {
 
   getSpreadsheet(spreadsheetId: string) {
     return call(async () => {
-      const { data } = await this.sheets.spreadsheets.get({ spreadsheetId, fields: "properties.title,sheets.properties.title" });
+      const { data } = await this.sheets.spreadsheets.get({ spreadsheetId, fields: "properties.title,sheets.properties(title,sheetId)" });
+      const sheets = (data.sheets ?? []).filter((s) => s.properties?.title);
       return {
         id: spreadsheetId,
         title: data.properties?.title ?? "Untitled spreadsheet",
-        tabs: (data.sheets ?? []).map((s) => s.properties?.title ?? "").filter(Boolean),
+        tabs: sheets.map((s) => s.properties!.title!),
+        tabIds: sheets.map((s) => s.properties!.sheetId ?? -1),
       };
     });
   }
@@ -50,7 +55,7 @@ export class ApiGoogleSource implements GoogleSource {
     return call(async () => {
       const { data } = await this.sheets.spreadsheets.values.get({
         spreadsheetId,
-        range: `'${tab.replace(/'/g, "''")}'`,
+        range: quoteTab(tab),
         majorDimension: "ROWS",
         valueRenderOption: "FORMATTED_VALUE",
       });
@@ -91,6 +96,38 @@ export class ApiGoogleSource implements GoogleSource {
       } while (pageToken && files.length < 50);
       return files.slice(0, 50);
     });
+  }
+
+  async ensureTab(spreadsheetId: string, tab: string, headers: string[]) {
+    const info = await this.getSpreadsheet(spreadsheetId);
+    if (!info.tabs.includes(tab)) {
+      await call(() => this.sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests: [{ addSheet: { properties: { title: tab } } }] } }));
+    } else if ((await this.readValues(spreadsheetId, tab)).length > 0) {
+      return;
+    }
+    await this.updateCells(spreadsheetId, tab, [{ range: "A1", values: [headers] }]);
+  }
+
+  async appendRows(spreadsheetId: string, tab: string, rows: CellValue[][]) {
+    await call(() =>
+      this.sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: quoteTab(tab),
+        valueInputOption: "RAW",
+        insertDataOption: "INSERT_ROWS",
+        requestBody: { values: rows },
+      }),
+    );
+  }
+
+  async updateCells(spreadsheetId: string, tab: string, updates: { range: string; values: CellValue[][] }[]) {
+    if (!updates.length) return;
+    await call(() =>
+      this.sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId,
+        requestBody: { valueInputOption: "RAW", data: updates.map((u) => ({ range: `${quoteTab(tab)}!${u.range}`, values: u.values })) },
+      }),
+    );
   }
 
   getFile(fileId: string) {

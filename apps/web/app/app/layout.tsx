@@ -1,11 +1,15 @@
 import { prisma } from "@cataloglink/db";
 import { AppShell } from "@/components/app-shell";
 import type { NavItem } from "@/components/nav-links";
+import { newOrderCount } from "@cataloglink/core/orders";
 import { requireClient } from "@/lib/auth";
+import { NewOrderWatcher } from "./new-order-watcher";
 import { exitImpersonationAction } from "./actions";
 
 const NAV: NavItem[] = [
   { href: "/app", label: "Dashboard", icon: "dashboard", exact: true },
+  { href: "/app/orders", label: "Orders", icon: "orders" },
+  { href: "/app/customers", label: "Customers", icon: "clients" },
   { href: "/app/products", label: "Products", icon: "products" },
   { href: "/app/links", label: "Links", icon: "links" },
   { href: "/app/sheet", label: "Google Sheet", icon: "sheet" },
@@ -15,10 +19,11 @@ const NAV: NavItem[] = [
 
 export default async function ClientLayout({ children }: { children: React.ReactNode }) {
   const { clientId, impersonatedBy } = await requireClient();
-  const client = await prisma.client.findUnique({
-    where: { id: clientId },
-    select: { businessName: true },
-  });
+  const [client, newOrders] = await Promise.all([
+    prisma.client.findUnique({ where: { id: clientId }, select: { businessName: true } }),
+    newOrderCount(clientId),
+  ]);
+  const nav = NAV.map((item) => (item.href === "/app/orders" ? { ...item, badge: newOrders } : item));
 
   const banner = impersonatedBy ? (
     <div className="bg-amber-100 text-amber-900">
@@ -34,7 +39,8 @@ export default async function ClientLayout({ children }: { children: React.React
   ) : undefined;
 
   return (
-    <AppShell title={client?.businessName ?? "Your business"} subtitle="Client dashboard" nav={NAV} banner={banner}>
+    <AppShell title={client?.businessName ?? "Your business"} subtitle="Client dashboard" nav={nav} banner={banner}>
+      <NewOrderWatcher initial={newOrders} />
       {children}
     </AppShell>
   );

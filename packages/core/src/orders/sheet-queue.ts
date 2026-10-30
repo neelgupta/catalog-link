@@ -7,7 +7,7 @@ export type OrderSheetJobData = { clientId: string; orderId: string };
 /**
  * Queues writing an order (or its new status) to the client's "Orders" sheet tab, when the client
  * switched that on and has a sheet connected. The job reads the order's latest state when it runs,
- * so repeated requests while one is waiting collapse into one. The worker side is Milestone 7.
+ * so repeated requests while one is waiting collapse into one (see sheet-writer.ts).
  */
 export async function enqueueOrderSheetWrite(clientId: string, orderId: string) {
   const client = await prisma.client.findUnique({

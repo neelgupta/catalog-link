@@ -415,6 +415,8 @@ model Order {
   rejectReason    String?
   cancelledBy     String?
   sheetWrittenAt  DateTime?
+  /// Last error writing this order to the client's "Orders" sheet tab (cleared on success).
+  sheetError      String?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 

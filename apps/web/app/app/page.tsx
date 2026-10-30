@@ -124,7 +124,9 @@ export default async function ClientHome() {
         subtitle="Here's how your catalog is doing."
       />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-4 xl:grid-cols-5">
-        <Stat label="New orders" value={newOrders} hint={newOrders ? "Waiting for you to confirm" : undefined} />
+        <Link href="/app/orders" className={`block rounded-2xl transition hover:ring-2 hover:ring-brand-100 ${newOrders ? "ring-2 ring-brand-500" : ""}`}>
+          <Stat label="New orders" value={newOrders} hint={newOrders ? "Waiting for you to confirm" : "View all orders"} />
+        </Link>
         <Stat label="Products on link" value={products} />
         <Stat label="Out of stock" value={outOfStock} />
         <Stat label="Custom links" value={customLinks} />

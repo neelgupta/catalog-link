@@ -145,9 +145,10 @@ Never commit `.env` or anything in `secrets/`.
 Until Google credentials are configured, the sync can be tried with local demo data:
 
 1. Add `GOOGLE_FAKE_DIR=./dev-fixtures/google` to `.env` and restart `pnpm dev`.
-2. Log in as a client (or use "Login as client" from Super Admin), open **Google Sheet**, choose option B and paste
-   `https://docs.google.com/spreadsheets/d/DEMO_shree_krishna_textiles_sheet/edit`.
-3. Pick the **Products** tab. The sync imports 5 products, reports 3 rows with deliberate mistakes, and the worker makes thumbnails.
+2. Log in as a client (or use "Login as client" from Super Admin) and open **Google Sheet**.
+3. Step 1: press **Use demo Google account** (shown in development only, under "Connect Google account").
+4. Step 2: paste `https://docs.google.com/spreadsheets/d/DEMO_catalog_sample_products/edit#gid=0` and press **Connect sheet**. The worker syncs 34 products and makes their thumbnails.
+   `DEMO_shree_krishna_textiles_sheet` is a smaller sheet with 3 deliberately broken rows, to see the error report.
 
 Only IDs starting with `DEMO_` (sheets) or `demo-` (Drive files/folders) are served from the fixtures; real sheets keep using Google, so the setting can stay on in development. Regenerate the data with `pnpm --filter @cataloglink/core dev:fixtures`.
 

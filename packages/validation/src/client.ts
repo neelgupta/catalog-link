@@ -145,3 +145,17 @@ export const clientSettingsSchema = z.object({
   newArrivalDays: optionalInt("New arrival days", 1, 90),
 });
 export type ClientSettingsInput = z.infer<typeof clientSettingsSchema>;
+
+// ───────────────────────────── Customers ─────────────────────────────
+
+export const customerSchema = z.object({
+  name: text("Name", 80),
+  shopName: optionalText(120),
+  mobile: mobileSchema,
+  city: optionalText(80),
+  address: optionalText(500),
+  gst: gstSchema,
+  /** Catalog links given to this customer. */
+  linkIds: z.array(z.string().min(1).max(40)).max(100).default([]),
+});
+export type CustomerInput = z.infer<typeof customerSchema>;

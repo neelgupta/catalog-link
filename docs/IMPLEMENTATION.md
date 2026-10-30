@@ -236,18 +236,25 @@ interface SheetSource {
 getSheetSource(connection): SheetSource  // picks OAuth or service-account credentials
 ```
 
-**OAuth flow**
-1. The client clicks **Connect Google account**. A server action creates a `state` (signed, bound to the session) and redirects to Google with the scopes `spreadsheets` + `drive.readonly`, `access_type=offline` and `prompt=consent`.
-2. `GET /api/v1/google/oauth/callback` checks `state`, exchanges the code, encrypts the refresh token (AES-256-GCM with `ENCRYPTION_KEY`) and stores it on `SheetConnection`.
-3. The client picks a spreadsheet from a list (Drive `files.list`, `mimeType = 'application/vnd.google-apps.spreadsheet'`), then picks a tab.
-4. We validate: read the header row and confirm the required columns map. Then the first sync is enqueued.
+**Client flow: two steps** (`/app/sheet`)
+1. **Connect your Google account.**
+   - A server action creates a `state` (signed, bound to the session) and redirects to Google with the scopes `spreadsheets` + `drive.readonly`, `access_type=offline` and `prompt=consent`.
+   - `GET /api/v1/google/oauth/callback` checks `state`, exchanges the code, encrypts the refresh token (AES-256-GCM with `ENCRYPTION_KEY`) and stores it on `SheetConnection` (`mode = OAUTH`, `googleEmail`).
+2. **Paste the Google Sheet link** (`connectSheetByLink` in `core/src/sync/connection.ts`).
+   - We open the spreadsheet with the client's own token.
+   - The tab is the one the link points at (`#gid=…`, matched against each tab's `sheetId`), otherwise the first tab whose header row has the required columns.
+   - A wrong tab or missing columns gets a message naming the tab and the missing columns. A sheet the account can't open gets a "your Google account (email) can't open this spreadsheet" message.
+   - The connection is saved and the first sync is queued.
 
-**Service-account flow**
-1. The dashboard shows the service account email and a copy button.
-2. The client shares the sheet (Editor) and their image folders (Viewer) with that email, then pastes the sheet URL.
-3. We parse the `spreadsheetId` from the URL and validate the same way as the OAuth flow. A 403 shows a clear "please share with …" message.
+The sheet and the Drive photos in its "Image Links" column (single files or folders) are read with the same OAuth token, by both the sync and the image worker. The client therefore doesn't share anything with CatalogLink, and private Drive photos work.
 
-**Scope verification risk:** `drive.readonly` is a Google *restricted* scope, so a public OAuth app needs a paid security assessment. For the MVP the OAuth app stays in **Testing** mode (up to 100 test users, and refresh tokens expire after 7 days), and the service-account flow is the main path for pilot clients. Before launch we decide whether to go through verification or switch the OAuth flow to `drive.file` + Google Picker, which is a narrower scope and needs a separate decision.
+**Development:** with `GOOGLE_FAKE_DIR` set, step 1 also offers **Use demo Google account** (`connectDemoGoogleAccount`), so step 2 can be tried with the `DEMO_…` fixture sheets without Google sign-in.
+
+**Service account (kept in code, hidden in the UI):**
+- `inspectSpreadsheetLink` + `selectSheet(…, "SERVICE_ACCOUNT", …)` and the service-account credentials still work, so existing connections made that way (e.g. the `pnpm demo:data` client) keep syncing.
+- The screen no longer offers it. It can come back as a fallback if the OAuth app isn't verified for launch (see below).
+
+**Scope verification risk:** `drive.readonly` is a Google *restricted* scope, so a public OAuth app needs a paid security assessment. For the MVP the OAuth app stays in **Testing** mode (up to 100 test users, and refresh tokens expire after 7 days). Before launch we decide whether to go through verification or switch the OAuth flow to `drive.file` + Google Picker, which is a narrower scope and needs a separate decision.
 
 ---
 
@@ -480,8 +487,8 @@ Repeatable jobs are registered when the worker starts (`upsertJobScheduler`, so 
 | `POST /auth/otp/send`, `POST /auth/otp/verify` | public | Client mobile-OTP login |
 | `GET /google/oauth/callback` | client | OAuth code exchange |
 | `GET /client/links/[id]/qr?format=png\|svg[&download=1]` | client | QR code for a link (PNG 1024 px or SVG) |
-| `GET /client/orders/[id]/pdf` | client | Order PDF / packing slip |
-| `GET /client/orders/export.xlsx` | client | Excel export |
+| `GET /client/orders/[id]/pdf?type=order\|packing` | client | Order PDF / packing slip |
+| `GET /client/orders/export?status=&q=&from=&to=` | client | Excel export |
 | `GET /client/orders/new-count` | client | New-order badge polling |
 | `GET /client/sync/status` | client | Sync/image progress, polled by the Google Sheet page |
 | `GET /sheet-template` | Super Admin or client | Template download |
@@ -704,16 +711,41 @@ The deployment target is not decided yet. The code keeps every option open:
   - Playwright at 390 px: 16 steps
 
 ### Milestone 7 — Order management
-- [ ] Orders list with status tabs, search, date filter, new-order badge
-- [ ] Order detail drawer
-- [ ] Status actions + reject/cancel with reason + restore hold
-- [ ] Mark payment received
-- [ ] Status machine + tests
-- [ ] ~~wa.me notify-customer button~~ (on hold, notifications)
-- [ ] Order PDF / packing slip
-- [ ] Excel export
-- [ ] Orders-tab worker (create tab, append, update status)
-- [ ] Customers: list, add, assign links, history, block/unblock
+- [x] Orders list `/app/orders`:
+  - tabs New · Confirmed · Packed · Dispatched · Delivered · Cancelled · All, with counts
+  - search by order no., customer, shop, city or mobile, plus an IST date range
+  - opens on "New" when something is waiting
+  - table on desktop, cards on phones
+- [x] New-order alert:
+  - "Orders" badge in the navigation and a "New orders" card on the dashboard
+  - `NewOrderWatcher` polls `GET /api/v1/client/orders/new-count` every 30 s; when the count changes it refreshes the page and shows the count in the tab title
+- [x] Order detail `/app/orders/[id]` (a page rather than a drawer, for phones):
+  - items with variants, GST and totals; the customer's notes and transport preference
+  - customer and delivery address, payment, history, Orders-tab status
+- [x] Status actions:
+  - Confirm → Mark packed → Mark dispatched (optional transport / LR note, kept in history) → Mark delivered
+  - Reject (while new) or cancel (before dispatch) with a reason the customer sees; held stock is returned (`changeOrderStatus` in `core/src/orders/manage.ts`, row-locked)
+- [x] Mark payment received / not received
+- [x] Status machine `core/src/orders/status.ts` (`assertTransition`, `nextStatuses`, tabs) + unit tests
+- [ ] ~~wa.me notify-customer button~~ (on hold with notifications). The customer sees each status on "My orders".
+- [x] Order PDF and packing slip:
+  - `GET /api/v1/client/orders/[id]/pdf?type=order|packing`, made with `pdfkit` and the bundled DejaVu Sans fonts (for ₹) in `packages/core/assets/fonts`
+  - the slip has no prices, with a tick box per line
+- [x] Excel export `GET /api/v1/client/orders/export?status=&q=&from=&to=`: one row per item, same filters as the list (`exceljs`)
+- [x] Orders tab (`core/src/orders/sheet-writer.ts`, worker queue `orders-sheet`):
+  - creates "Orders" with headers if missing, appends one row per item, then only rewrites the Payment Received / Status cells
+  - values are written `RAW`, so they're never treated as formulas
+  - errors are stored on `Order.sheetError` (migration `order_sheet_error`) and retried 5× with backoff; orders are never blocked
+  - `GoogleSource` gained `ensureTab`, `appendRows` and `updateCells`; the dev fixture source writes to the git-ignored `dev-fixtures/google/.writes/`
+- [x] Customers `/app/customers`:
+  - list with order count, total ordered (excluding cancelled orders) and last order; search; blocked filter
+  - add by hand and assign catalog links
+  - customer page with order history, edit and block / unblock
+  - the mobile can't change once a customer has orders, because "My orders" finds orders by mobile
+- [x] Tests:
+  - unit `status.test.ts`
+  - DB `manage.db.test.ts`: transitions, history, stock return, tenant check, payment, tabs, search, Orders-tab append/update/error, PDF/XLSX, customers
+  - Playwright: 14 steps, customer order → seller badge → full status flow → reject → files → Orders tab → customers
 
 ### Milestone 8 — Hardening & release prep
 - [ ] Cron: mark expired plans, cleanup (reminder and digest emails on hold)

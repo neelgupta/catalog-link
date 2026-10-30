@@ -6,6 +6,12 @@ export function parseSpreadsheetId(input: string): string | null {
   return /^[a-zA-Z0-9_-]{20,}$/.test(s) ? s : null;
 }
 
+/** The tab id from a sheet URL (`…/edit#gid=123` or `?gid=123`), if the link points at a tab. */
+export function parseSheetGid(input: string): number | null {
+  const m = input.match(/[#?&]gid=(\d+)/);
+  return m ? Number(m[1]) : null;
+}
+
 export type ImageRef =
   | { kind: "file"; id: string }
   | { kind: "folder"; id: string }

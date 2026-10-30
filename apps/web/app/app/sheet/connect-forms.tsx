@@ -6,7 +6,15 @@ import { Button, FormError, Input } from "@/components/ui";
 import type { ActionState } from "@/lib/actions";
 import { copyText } from "@/lib/copy-text";
 
-export function PasteLinkForm({ action }: { action: (s: ActionState, f: FormData) => Promise<ActionState> }) {
+export function PasteLinkForm({
+  action,
+  submitLabel = "Continue",
+  pendingText = "Checking…",
+}: {
+  action: (s: ActionState, f: FormData) => Promise<ActionState>;
+  submitLabel?: string;
+  pendingText?: string;
+}) {
   const [state, formAction] = useActionState(action, {});
   return (
     <form action={formAction} className="space-y-3">
@@ -20,16 +28,26 @@ export function PasteLinkForm({ action }: { action: (s: ActionState, f: FormData
         required
       />
       <FormError message={state.fieldErrors?.sheetUrl ? undefined : state.error} />
-      <SubmitButton pendingText="Checking…">Continue</SubmitButton>
+      <SubmitButton pendingText={pendingText}>{submitLabel}</SubmitButton>
     </form>
   );
 }
 
-export function GoogleButton({ action }: { action: () => Promise<ActionState> }) {
+export function GoogleButton({
+  action,
+  label = "Connect Google account",
+  variant,
+}: {
+  action: () => Promise<ActionState>;
+  label?: string;
+  variant?: "primary" | "secondary" | "ghost";
+}) {
   const [state, formAction] = useActionState(action, {});
   return (
     <form action={formAction} className="space-y-3">
-      <SubmitButton pendingText="Opening Google…">Connect Google account</SubmitButton>
+      <SubmitButton pendingText="Opening Google…" variant={variant}>
+        {label}
+      </SubmitButton>
       <FormError message={state.error} />
     </form>
   );

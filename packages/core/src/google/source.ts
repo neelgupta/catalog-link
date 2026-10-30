@@ -6,7 +6,8 @@ export type DriveFile = {
   size: number | null;
 };
 
-export type SpreadsheetInfo = { id: string; title: string; tabs: string[] };
+/** `tabIds[i]` is the numeric id (the `gid` in sheet URLs) of `tabs[i]`. */
+export type SpreadsheetInfo = { id: string; title: string; tabs: string[]; tabIds: number[] };
 
 /** Everything CatalogLink needs from Google, behind one interface (real API or dev fixtures). */
 export interface GoogleSource {
@@ -18,7 +19,15 @@ export interface GoogleSource {
   listFolderImages(folderId: string): Promise<DriveFile[]>;
   getFile(fileId: string): Promise<DriveFile>;
   download(fileId: string): Promise<Buffer>;
+  /** Creates the tab with this header row if it doesn't exist (or is empty). Needs write access. */
+  ensureTab(spreadsheetId: string, tab: string, headers: string[]): Promise<void>;
+  /** Appends rows after the last row of the tab. Values are stored as given (never as formulas). */
+  appendRows(spreadsheetId: string, tab: string, rows: CellValue[][]): Promise<void>;
+  /** Overwrites cell ranges, e.g. `{ range: "B5:C5", values: [["x", 1]] }` (A1 notation within the tab). */
+  updateCells(spreadsheetId: string, tab: string, updates: { range: string; values: CellValue[][] }[]): Promise<void>;
 }
+
+export type CellValue = string | number;
 
 /** Why a Google call failed, in terms the client can act on. */
 export type GoogleErrorKind = "no_access" | "not_found" | "auth" | "rate_limited" | "unavailable" | "unknown";

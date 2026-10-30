@@ -14,7 +14,7 @@ if (process.env.GOOGLE_FAKE_DIR) process.env.GOOGLE_FAKE_DIR = resolve(repoRoot,
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@cataloglink/core", "@cataloglink/db", "@cataloglink/validation"],
-  serverExternalPackages: ["@node-rs/argon2", "bullmq", "ioredis", "pg", "@prisma/adapter-pg", "sharp", "exceljs", "google-auth-library", "@googleapis/sheets", "@googleapis/drive"],
+  serverExternalPackages: ["@node-rs/argon2", "bullmq", "ioredis", "pg", "@prisma/adapter-pg", "sharp", "exceljs", "pdfkit", "google-auth-library", "@googleapis/sheets", "@googleapis/drive"],
   // Development only: let phones and other computers on the local network load the dev server's
   // scripts (Next.js only allows localhost by default). Ignored in production.
   allowedDevOrigins: ["192.168.*.*", "10.*.*.*", "172.16.*.*", "*.local"],

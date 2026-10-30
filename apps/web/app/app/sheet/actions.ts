@@ -2,7 +2,14 @@
 
 import { DomainError } from "@cataloglink/core/errors";
 import { buildAuthUrl } from "@cataloglink/core/google";
-import { disconnectSheet, enqueueSync, inspectSpreadsheetLink, selectSheet } from "@cataloglink/core/sync";
+import {
+  connectDemoGoogleAccount,
+  connectSheetByLink,
+  disconnectSheet,
+  enqueueSync,
+  inspectSpreadsheetLink,
+  selectSheet,
+} from "@cataloglink/core/sync";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { type ActionState, errorState } from "@/lib/actions";
@@ -21,7 +28,29 @@ export async function startGoogleOAuthAction(): Promise<ActionState> {
   redirect(url);
 }
 
-/** Service account path: check a pasted sheet link, then go pick a tab. */
+/** Step 2: connect the pasted sheet link with the client's Google account and start the first sync. */
+export async function connectSheetLinkAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const { clientId } = await requireClient();
+  const sheetUrl = String(formData.get("sheetUrl") ?? "");
+  try {
+    await connectSheetByLink(clientId, sheetUrl);
+    await enqueueSync(clientId, "MANUAL");
+  } catch (err) {
+    return errorState(err, { sheetUrl });
+  }
+  revalidatePath("/app", "layout");
+  redirect("/app/sheet?connected=sheet");
+}
+
+/** Development only: a pretend Google account for trying the steps with the demo sheets. */
+export async function connectDemoGoogleAction() {
+  const { clientId } = await requireClient();
+  await connectDemoGoogleAccount(clientId);
+  revalidatePath("/app/sheet");
+  redirect("/app/sheet?connected=google");
+}
+
+/** Service account path (kept for existing connections): check a pasted sheet link, then go pick a tab. */
 export async function inspectLinkAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   await requireClient();
   const sheetUrl = String(formData.get("sheetUrl") ?? "");

@@ -29,7 +29,9 @@
     "./qr": "./src/qr.ts",
     "./catalog": "./src/catalog.ts",
     "./orders": "./src/orders/index.ts",
-    "./orders-sheet": "./src/orders/sheet-queue.ts"
+    "./orders-sheet": "./src/orders/sheet-queue.ts",
+    "./order-documents": "./src/orders/documents.ts",
+    "./customers": "./src/customers.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -50,12 +52,14 @@
     "google-auth-library": "11.3.1",
     "ioredis": "6.0.0",
     "jose": "6.2.13",
+    "pdfkit": "0.20.2",
     "qrcode": "1.5.4",
     "sharp": "0.35.5",
     "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/node": "24.19.2",
+    "@types/pdfkit": "0.17.7",
     "@types/qrcode": "1.5.6",
     "dotenv": "18.0.9",
     "tsx": "4.23.15",
